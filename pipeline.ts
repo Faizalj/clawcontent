@@ -768,15 +768,26 @@ export async function runPipeline(contentId: number): Promise<void> {
 }
 
 export async function retryStep(contentId: number, stepName: string): Promise<void> {
-  const job = getPipelineJobs(contentId).find(
+  const jobs = getPipelineJobs(contentId);
+  const job = jobs.find(
     (j: any) => j.step === stepName && (j.status === "failed" || j.status === "done")
   );
   if (!job) throw new Error(`No retryable job for step "${stepName}" on content ${contentId}`);
 
+  // Reset ONLY this step — don't touch other steps
   updatePipelineJob(job.id, { status: "pending", error: null, output_path: null });
-  // Also reset content status back to producing if it was done
   updateContentStatus(contentId, "producing");
-  console.log(`🔄 Retrying step: ${stepName}`);
+  console.log(`🔄 Retrying step: ${stepName} (only this step)`);
+
+  // Also reset all steps AFTER this one to pending (they depend on this step's output)
+  let foundTarget = false;
+  for (const j of jobs) {
+    if (j.id === job.id) { foundTarget = true; continue; }
+    if (foundTarget && j.status !== "pending") {
+      updatePipelineJob(j.id, { status: "pending", error: null, output_path: null });
+    }
+  }
+
   await runPipeline(contentId);
 }
 
