@@ -711,15 +711,34 @@ async function rejectContent(id) {
 }
 
 async function generateScript(id) {
-  await api(`/api/script/${id}/generate`, 'POST');
+  // Find and disable the button
+  const btn = event?.target;
+  if (btn) { btn.disabled = true; btn.textContent = 'Generating...'; }
+
+  const result = await api(`/api/script/${id}/generate`, 'POST');
+
+  if (result.error) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Generate Script'; }
+    alert(result.error);
+    return;
+  }
+
+  // Poll for script completion
   let polls = 0;
   const interval = setInterval(async () => {
     polls++;
+    if (btn) btn.textContent = `Generating... ${polls * 5}s`;
+
     const script = await api(`/api/script/${id}`);
-    if ((script && script.draft_text) || polls >= 24) {
+    if (script && script.draft_text) {
       clearInterval(interval);
+      if (btn) { btn.disabled = false; btn.textContent = 'Generate Script'; }
       loadChannels();
       loadContent();
+    } else if (polls >= 36) {
+      clearInterval(interval);
+      if (btn) { btn.disabled = false; btn.textContent = 'Generate Script'; }
+      alert('Script generation timeout — agent may still be working, refresh to check');
     }
   }, 5000);
 }
