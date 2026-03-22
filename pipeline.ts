@@ -154,6 +154,7 @@ function stripScriptForTTS(markdown: string): string {
     .replace(/^#+\s+.*$/gm, "")             // ## any heading → remove entire line
     .replace(/<!--.*?-->/gs, "")            // <!-- image: ... --> → remove
     .replace(/^[\*\-_]{3,}\s*$/gm, "")      // *** --- ___ horizontal rules → remove
+    .replace(/^(ความยาว|โทน|หมายเหตุ|Note|Duration|Tone|Style|Format):.*$/gmi, "")  // metadata lines
     .replace(/\*\*/g, "")                    // **bold** → bold
     .replace(/\*/g, "")                      // *italic* → italic
     .replace(/\(.*?\)/g, "")                 // (stage directions) → remove
@@ -323,9 +324,11 @@ async function stepCaptions(contentId: number, ctx: PipelineContext): Promise<st
     .replace(/<!--.*?-->/gs, "")
     .replace(/^#+\s*\[.*?\].*$/gm, "")
     .replace(/^#+\s+.*$/gm, "")
+    .replace(/^(ความยาว|โทน|หมายเหตุ|Note|Duration|Tone|Style|Format):.*$/gmi, "")
     .replace(/\*\*/g, "")
     .replace(/\*/g, "")
     .replace(/\(.*?\)/g, "")
+    .replace(/^[\*\-_]{3,}\s*$/gm, "")
     .trim();
   writeFileSync(scriptPath, cleanScript, "utf-8");
 
