@@ -63,36 +63,11 @@ Open http://localhost:3456 and click the ⚙️ gear icon.
 
 If keys exist in `~/.env`, the system reads them automatically — no need to re-enter.
 
-## Step 4: Setup HuggingFace (Required for Image Generation)
-
-Flux image model requires HuggingFace account + license acceptance.
-
-### 4.1 Create HuggingFace Account
-Go to [huggingface.co](https://huggingface.co/join) and create an account.
-
-### 4.2 Accept Model Licenses
-Visit each page and click **"Agree and access repository"**:
-- [FLUX.1-schnell](https://huggingface.co/black-forest-labs/FLUX.1-schnell) — Image generation
-
-### 4.3 Create Access Token
-Go to [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens):
-1. Click "New token"
-2. Name: `clawcontent`
-3. Type: `Read`
-4. Copy the token (starts with `hf_`)
-
-### 4.4 Save Token to ~/.env
-```bash
-echo 'HF_TOKEN=hf_your_token_here' >> ~/.env
-```
-
-Verify: `grep HF_TOKEN ~/.env` should show your token.
-
-## Step 5: Deploy Modal Scripts
+## Step 4: Deploy Modal Scripts
 
 ```bash
 cd ~/Project/clawcontent
-modal deploy modal/flux_image.py       # Flux image generation
+modal deploy modal/flux_image.py       # Z-Image-Turbo image generation (T4, no HF license needed)
 modal deploy modal/lipsync.py          # LTX-2.3 lipsync
 modal deploy modal/chatterbox_tts.py   # English TTS (Chatterbox)
 modal deploy modal/f5tts_thai.py       # Thai TTS (F5-TTS)
@@ -125,7 +100,7 @@ Dashboard (Bun + SQLite, port 3456)
     │                   └─ AI brief → workflow
     │
     ├─ Production ───→ Modal Serverless (GPU)
-    │                   ├─ modal/flux_image.py (Flux image gen)
+    │                   ├─ modal/flux_image.py (Z-Image-Turbo image gen)
     │                   ├─ modal/lipsync.py (LTX-2.3)
     │                   ├─ modal/chatterbox_tts.py (English TTS)
     │                   └─ modal/f5tts_thai.py (Thai TTS)
