@@ -365,31 +365,56 @@ async function stepAssembly(contentId: number, ctx: PipelineContext): Promise<st
   const hasImages = ctx.imagePaths.length > 0 && ctx.imagePaths.every(p => existsSync(p));
 
   if (hasLipsync && hasImages) {
-    // Best case: lipsync (main) + images (insert) intercut
-    console.log("🎬 Assembling: lipsync (main) + image inserts...");
+    // Lipsync = main video (audio + lip sync), images = overlay inserts
+    // Audio stays continuous from lipsync — lips stay in sync
+    console.log("🎬 Assembling: lipsync (main) + image inserts (overlay)...");
 
-    // Create image inserts as short clips (3s each)
+    // Get lipsync duration
+    const lipDurStr = await $`ffprobe -v quiet -show_entries format=duration -of csv=p=0 ${ctx.lipsyncPath}`.text();
+    const lipDur = parseFloat(lipDurStr.trim());
+
+    // Scale lipsync to 1280x720 if needed
+    const scaledLip = `${ctx.outputDir}/lipsync_scaled.mp4`;
+    await $`ffmpeg -y -i ${ctx.lipsyncPath} -vf scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2 -c:a copy ${scaledLip}`.quiet();
+
+    // Create insert clips (5s each, scaled to 1280x720)
     const insertClips: string[] = [];
     for (let i = 0; i < ctx.imagePaths.length; i++) {
       const clipPath = `${ctx.outputDir}/insert_${i}.mp4`;
-      await $`ffmpeg -y -loop 1 -i ${ctx.imagePaths[i]} -c:v libx264 -t 3 -pix_fmt yuv420p -vf scale=1280:720 ${clipPath}`.quiet();
+      await $`ffmpeg -y -loop 1 -i ${ctx.imagePaths[i]} -c:v libx264 -t 5 -pix_fmt yuv420p -vf scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2 -r 25 ${clipPath}`.quiet();
       insertClips.push(clipPath);
     }
 
-    // Build concat list: alternate lipsync segments + insert clips
-    // For now: lipsync is main, insert clips go between sections
-    // Simple approach: lipsync full + append insert clips at end as B-roll
-    const concatPath = `${ctx.outputDir}/assembly.txt`;
-    let concatContent = `file '${ctx.lipsyncPath}'\n`;
-    for (const clip of insertClips) {
-      concatContent += `file '${clip}'\n`;
+    // Calculate overlay timestamps — distribute inserts evenly across video
+    // Leave first 10s and last 10s as pure lipsync
+    const insertDur = 5;
+    const usableDur = lipDur - 20;
+    const interval = usableDur / (insertClips.length + 1);
+
+    // Build ffmpeg overlay filter — each insert overlays at its timestamp
+    // Audio from lipsync stays continuous (no shift)
+    let filterParts: string[] = [];
+    let lastOutput = "0:v";
+
+    for (let i = 0; i < insertClips.length; i++) {
+      const startTime = Math.round(10 + interval * (i + 1));
+      const endTime = startTime + insertDur;
+      const inputIdx = i + 1;
+      const outLabel = i === insertClips.length - 1 ? "vout" : `v${i}`;
+
+      filterParts.push(`[${inputIdx}:v]setpts=PTS-STARTPTS[ins${i}]`);
+      filterParts.push(`[${lastOutput}][ins${i}]overlay=enable='between(t,${startTime},${endTime})'[${outLabel}]`);
+      lastOutput = outLabel;
+
+      console.log(`  📎 Insert ${i}: ${startTime}s-${endTime}s`);
     }
-    writeFileSync(concatPath, concatContent, "utf-8");
 
-    // For V1: just use lipsync as main video (inserts need timeline editing — complex)
-    await $`cp ${ctx.lipsyncPath} ${outPath}`.quiet();
+    const inputArgs = insertClips.map(c => `-i ${c}`).join(" ");
+    const filterStr = filterParts.join("; ");
 
-    console.log(`📎 ${insertClips.length} insert clips ready in output dir for manual editing`);
+    await $`bash -c ${"ffmpeg -y -i " + scaledLip + " " + inputArgs + ' -filter_complex "' + filterStr + '" -map "[vout]" -map 0:a -c:a copy -shortest ' + outPath}`.quiet();
+
+    console.log(`✅ ${insertClips.length} inserts overlaid on lipsync`);
 
   } else if (hasLipsync) {
     // Lipsync only, no inserts
