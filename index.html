@@ -284,7 +284,8 @@
     <h3>Channels <button class="add-btn" onclick="openChannelModal()" title="Add Channel">+</button></h3>
     <div id="channel-list"></div>
 
-    <h3 style="margin-top:16px;">Workflows <button class="add-btn" onclick="openWorkflowEditor()" title="Create Workflow">+</button></h3>
+    <div style="border-top:1px solid #21262d;margin:14px 0;"></div>
+    <h3>Workflows <button class="add-btn" onclick="openWorkflowEditor()" title="Create Workflow">+</button></h3>
     <div id="workflow-list"></div>
   </div>
 
@@ -302,13 +303,13 @@
 
     <div class="tabs">
       <div class="tab active" data-status="discovered" onclick="setTab(this)">
-        Discovered
+        Ideas
       </div>
       <div class="tab" data-status="approved" onclick="setTab(this)">
         Approved
       </div>
       <div class="tab" data-status="scripted" onclick="setTab(this)">
-        Scripted
+        Script
       </div>
       <div class="tab" data-status="script_approved" onclick="setTab(this)">
         Ready
@@ -322,10 +323,15 @@
     </div>
 
     <div id="content-area">
-      <div class="empty">
-        <div class="icon" style="font-size:40px;opacity:0.4;">&#9654;</div>
-        <div class="text" style="font-size:15px;">Select a channel to get started</div>
-        <div style="color:#6e7681;font-size:12px;margin-top:8px;">or create a new one with the + button</div>
+      <div class="empty" id="welcome-screen">
+        <div style="font-size:36px;margin-bottom:8px;">
+          <span style="background:linear-gradient(135deg,#FF6600,#FF8533);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:700;">ClawContent</span>
+        </div>
+        <div class="text" style="font-size:15px;margin-bottom:24px;">Content Automation Dashboard</div>
+        <div style="text-align:left;max-width:400px;margin:0 auto;">
+          <div style="font-size:13px;color:#8b949e;margin-bottom:12px;">Quick Start:</div>
+          <div id="onboarding-steps" style="display:flex;flex-direction:column;gap:10px;"></div>
+        </div>
       </div>
     </div>
 
@@ -563,8 +569,7 @@ async function loadChannels() {
       </div>
       <div class="desc">${esc(ch.description)}</div>
       <div style="font-size:11px;color:#8b949e;margin-top:2px;">
-        ${(() => { const a = agentCache.find(x => x.id === ch.agent_id); return a ? `${esc(a.emoji || '')} ${esc(a.id)}` : 'no agent'; })()}
-        | ${esc(ch.research_type)} | ${esc(ch.workflow_id || 'none')}
+        ${esc(ch.workflow_id || 'default')} | ${esc(ch.research_type)}
       </div>
       <div class="counts">
         ${ch.counts.discovered ? `<span class="badge discovered">${ch.counts.discovered} new</span>` : ''}
@@ -1051,15 +1056,10 @@ async function loadWorkflows() {
   const list = document.getElementById('workflow-list');
   if (list) {
     list.innerHTML = workflowCache.map(w => `
-      <div class="channel-card" onclick="openWorkflowEditor('${esc(w.id)}')" style="border-left:3px solid ${w.source === 'file' ? '#30363d' : '#58a6ff'};">
+      <div class="channel-card" onclick="openWorkflowEditor('${esc(w.id)}')" style="border-left:3px solid ${w.source === 'file' ? '#30363d' : '#58a6ff'};padding:8px 10px;">
         <div style="display:flex;justify-content:space-between;align-items:center;">
-          <div class="name" style="font-size:13px;">${esc(w.name)}</div>
-          <span style="font-size:10px;color:#8b949e;">${w.source === 'file' ? 'built-in' : 'custom'}</span>
-        </div>
-        <div class="desc">${esc(w.description)}</div>
-        <div style="font-size:11px;color:#8b949e;margin-top:4px;">
-          ${w.steps.map(s => STEP_ICONS[s] || '📦').join(' ')}
-          <span style="margin-left:4px;">${w.steps.length} steps</span>
+          <div class="name" style="font-size:12px;">${esc(w.name)}</div>
+          <span style="font-size:9px;color:#6e7681;background:#21262d;padding:1px 6px;border-radius:8px;">${w.steps.length} steps</span>
         </div>
       </div>
     `).join('');
@@ -1341,7 +1341,38 @@ async function loadAgents() {
 }
 
 // Initial load
-Promise.all([loadAgents(), loadWorkflows()]).then(() => loadChannels());
+Promise.all([loadAgents(), loadWorkflows()]).then(() => {
+  loadChannels();
+  updateOnboarding();
+});
+
+async function updateOnboarding() {
+  const el = document.getElementById('onboarding-steps');
+  if (!el) return;
+
+  const settings = await api('/api/settings');
+  const channels = await api('/api/channels');
+  const hasAgent = settings.find(s => s.key === 'DEFAULT_AGENT_ID' && s.source !== 'not-set');
+  const hasModal = settings.find(s => s.key === 'MODAL_TOKEN_ID' && s.source !== 'not-set');
+  const hasChannel = channels.length > 0;
+
+  const steps = [
+    { done: hasAgent, label: 'Set Default AI Agent', action: 'openSettingsModal()', icon: '1' },
+    { done: hasModal, label: 'Add Modal Token (GPU)', action: 'openSettingsModal()', icon: '2' },
+    { done: hasChannel, label: 'Create a Channel', action: 'openChannelModal()', icon: '3' },
+    { done: false, label: 'Scan for Content Ideas', action: '', icon: '4' },
+  ];
+
+  el.innerHTML = steps.map(s => `
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:#161b22;border:1px solid #30363d;border-radius:8px;${s.done ? 'opacity:0.5;' : ''}">
+      <div style="width:28px;height:28px;border-radius:50%;background:${s.done ? '#238636' : '#30363d'};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;">
+        ${s.done ? '&#10003;' : s.icon}
+      </div>
+      <span style="flex:1;font-size:13px;${s.done ? 'text-decoration:line-through;' : ''}">${s.label}</span>
+      ${!s.done && s.action ? `<button class="btn primary" onclick="${s.action}" style="font-size:11px;padding:4px 12px;">Setup</button>` : ''}
+    </div>
+  `).join('');
+}
 </script>
 </body>
 </html>
