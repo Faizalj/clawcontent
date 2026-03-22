@@ -63,19 +63,21 @@ Open http://localhost:3456 and click the ⚙️ gear icon.
 
 If keys exist in `~/.env`, the system reads them automatically — no need to re-enter.
 
-## Step 4: Deploy Modal Scripts
+## Step 4: Setup Modal CLI
+
+Modal scripts run on-demand via `modal run` — no deployment step needed.
+The system calls Modal automatically when production pipeline runs.
+First run downloads models (slow). Subsequent runs use cached models.
 
 ```bash
-cd ~/Project/clawcontent
-modal deploy modal/flux_image.py       # Z-Image-Turbo image generation (T4, no HF license needed)
-modal deploy modal/lipsync.py          # LTX-2.3 lipsync
-modal deploy modal/chatterbox_tts.py   # English TTS (Chatterbox)
-modal deploy modal/f5tts_thai.py       # Thai TTS (F5-TTS)
+# Install Modal CLI (if not installed)
+pip install modal
+
+# Authenticate (one time)
+modal setup
 ```
 
-First deploy downloads models (slow). Subsequent runs are fast.
-
-If user doesn't have Modal account yet: `modal setup` to authenticate.
+Verify: `modal profile list` should show your workspace.
 
 ## Step 6: Create First Channel
 
