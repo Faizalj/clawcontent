@@ -17,6 +17,8 @@ import {
   setSetting,
   setScanStatus,
   getScanStatus,
+  setTaskStatus,
+  getTaskStatus,
 } from "./db";
 import { sendToAgent, parseAgentJson, getAgentList } from "./agent";
 import { buildResearchPrompt, buildScriptPrompt } from "./research";
@@ -152,6 +154,8 @@ Bun.serve({
       if (!agentId) return Response.json({ error: "No AI agent configured. Set Default Agent in Settings or assign agent to channel." }, { status: 400 });
       const prompt = buildScriptPrompt(channel, content);
 
+      setTaskStatus(`script:${contentId}`, "generating", `Generating via agent ${agentId}...`);
+
       // Run in background
       (async () => {
         console.log(`✍️ Generating script for: ${content.title}...`);
@@ -160,8 +164,10 @@ Bun.serve({
         if (response.success) {
           addScript(contentId, response.message, agentId);
           console.log(`✅ Script generated for: ${content.title}`);
+          setTaskStatus(`script:${contentId}`, "done", "Script generated");
         } else {
           console.error(`❌ Script gen failed:`, response.message);
+          setTaskStatus(`script:${contentId}`, "error", response.message);
         }
       })();
 
@@ -209,6 +215,13 @@ Bun.serve({
     const scanStatusMatch = path.match(/^\/api\/scan-status\/(.+)$/);
     if (scanStatusMatch && req.method === "GET") {
       const status = getScanStatus(scanStatusMatch[1]);
+      return Response.json(status || { status: "idle", message: "" });
+    }
+
+    // GET /api/task-status/:key — poll any task progress
+    const taskStatusMatch = path.match(/^\/api\/task-status\/(.+)$/);
+    if (taskStatusMatch && req.method === "GET") {
+      const status = getTaskStatus(decodeURIComponent(taskStatusMatch[1]));
       return Response.json(status || { status: "idle", message: "" });
     }
 

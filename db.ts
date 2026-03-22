@@ -307,6 +307,28 @@ export function getScanStatus(channelId: string) {
   return db.query("SELECT * FROM scan_status WHERE channel_id = ?").get(channelId) as any;
 }
 
+// --- Task Status (generic for scan, script gen, etc.) ---
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS task_status (
+    key TEXT PRIMARY KEY,
+    status TEXT DEFAULT 'idle',
+    message TEXT,
+    updated_at TEXT DEFAULT (datetime('now'))
+  )
+`);
+
+export function setTaskStatus(key: string, status: string, message: string = "") {
+  db.run(
+    `INSERT OR REPLACE INTO task_status (key, status, message, updated_at) VALUES (?, ?, ?, datetime('now'))`,
+    [key, status, message]
+  );
+}
+
+export function getTaskStatus(key: string) {
+  return db.query("SELECT * FROM task_status WHERE key = ?").get(key) as any;
+}
+
 // --- Settings Queries ---
 
 export function getSetting(key: string): string | null {

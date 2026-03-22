@@ -634,7 +634,7 @@ async function loadContent() {
           <button class="btn danger" onclick="rejectContent(${item.id})">Reject</button>
         ` : ''}
         ${item.status === 'approved' ? `
-          <button class="btn primary" onclick="generateScript(${item.id})">Generate Script</button>
+          <button class="btn primary" id="gen-btn-${item.id}" onclick="generateScript(${item.id})">Generate Script</button>
         ` : ''}
         ${item.status === 'scripted' ? `
           <button class="btn" onclick="viewScript(${item.id}, '${item.title.replace(/'/g, "\\'")}')">View Script</button>
@@ -649,6 +649,16 @@ async function loadContent() {
       </div>
     </div>
   `).join('') + '</div>';
+
+  // Resume polling for any in-progress script generation
+  if (currentStatus === 'approved') {
+    for (const item of items) {
+      const status = await api(`/api/task-status/script:${item.id}`);
+      if (status.status === 'generating') {
+        pollScriptStatus(item.id);
+      }
+    }
+  }
 }
 
 async function scanChannel() {
@@ -711,8 +721,7 @@ async function rejectContent(id) {
 }
 
 async function generateScript(id) {
-  // Find and disable the button
-  const btn = event?.target;
+  const btn = document.getElementById(`gen-btn-${id}`) || event?.target;
   if (btn) { btn.disabled = true; btn.textContent = 'Generating...'; }
 
   const result = await api(`/api/script/${id}/generate`, 'POST');
@@ -723,24 +732,32 @@ async function generateScript(id) {
     return;
   }
 
-  // Poll for script completion
-  let polls = 0;
-  const interval = setInterval(async () => {
-    polls++;
-    if (btn) btn.textContent = `Generating... ${polls * 5}s`;
+  pollScriptStatus(id);
+}
 
-    const script = await api(`/api/script/${id}`);
-    if (script && script.draft_text) {
+function pollScriptStatus(id) {
+  const btn = document.getElementById(`gen-btn-${id}`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Generating...'; }
+
+  const interval = setInterval(async () => {
+    const status = await api(`/api/task-status/script:${id}`);
+
+    if (status.status === 'done') {
       clearInterval(interval);
       if (btn) { btn.disabled = false; btn.textContent = 'Generate Script'; }
       loadChannels();
       loadContent();
-    } else if (polls >= 36) {
+    } else if (status.status === 'error') {
       clearInterval(interval);
       if (btn) { btn.disabled = false; btn.textContent = 'Generate Script'; }
-      alert('Script generation timeout — agent may still be working, refresh to check');
+      alert('Script failed: ' + (status.message || 'Unknown error'));
+    } else if (btn) {
+      btn.textContent = 'Generating...';
     }
-  }, 5000);
+  }, 3000);
+
+  // Safety timeout
+  setTimeout(() => clearInterval(interval), 300000);
 }
 
 async function viewScript(contentId, title) {
