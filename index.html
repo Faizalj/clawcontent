@@ -900,6 +900,7 @@ async function refreshPipeline() {
           ${job.output_path && job.status === 'done' ? `<div class="step-detail">${esc(job.output_path)}</div>` : ''}
           <div class="step-detail chunk-progress" data-step="${job.step}" data-content="${currentPipelineContentId}" style="display:none;"></div>
         </div>
+        ${job.status === 'running' ? `<button class="btn danger" style="font-size:11px;padding:4px 8px;" onclick="stopPipelineStep(${currentPipelineContentId}, '${job.step}')">Stop</button>` : ''}
         ${job.status === 'failed' || job.status === 'done' ? `<button class="btn" style="font-size:11px;padding:4px 8px;" onclick="retryPipelineStep(${currentPipelineContentId}, '${job.step}')">${job.status === 'failed' ? 'Retry' : 'Redo'}</button>` : ''}
       </div>
     `;
@@ -924,6 +925,12 @@ async function refreshPipeline() {
   }
 
   return jobs;
+}
+
+async function stopPipelineStep(contentId, step) {
+  if (!confirm(`Stop ${step}? Modal process will be killed.`)) return;
+  await api(`/api/production/${contentId}/stop/${step}`, 'POST');
+  refreshPipeline();
 }
 
 async function retryPipelineStep(contentId, step) {

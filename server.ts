@@ -13,6 +13,7 @@ import {
   deleteChannel,
   getPipelineJobs,
   deletePipelineJobs,
+  updatePipelineJob,
   getAllSettings,
   setSetting,
   setScanStatus,
@@ -437,6 +438,37 @@ steps:
       });
 
       return Response.json({ ok: true, message: `Retrying ${step}` });
+    }
+
+    // POST /api/production/:id/stop/:step — stop a running step
+    const prodStopMatch = path.match(/^\/api\/production\/(\d+)\/stop\/(.+)$/);
+    if (prodStopMatch && req.method === "POST") {
+      const contentId = parseInt(prodStopMatch[1]);
+      const step = prodStopMatch[2];
+
+      // Kill Modal process for this step
+      const scriptMap: Record<string, string> = {
+        images: "flux_image",
+        lipsync: "lipsync",
+        voice: "chatterbox_tts",
+      };
+      const pattern = scriptMap[step] || step;
+      try {
+        require("child_process").execSync(`pkill -f 'modal run.*${pattern}' 2>/dev/null || true`);
+      } catch {}
+
+      // Update status to failed
+      const jobs = getPipelineJobs(contentId);
+      const job = jobs.find((j: any) => j.step === step && j.status === "running");
+      if (job) {
+        updatePipelineJob(job.id, {
+          status: "failed",
+          error: "Stopped by user",
+          completed_at: new Date().toISOString(),
+        });
+      }
+
+      return Response.json({ ok: true, message: `Stopped ${step}` });
     }
 
     // POST /api/production/:id/reset — reset back to script_approved
