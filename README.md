@@ -116,22 +116,114 @@ Dashboard (Bun + SQLite, port 3456)
 clawcontent/
 ├── server.ts          # Bun HTTP server + API routes
 ├── db.ts              # SQLite schema + queries
-├── pipeline.ts        # Production pipeline orchestrator
-├── workflow.ts        # Workflow YAML engine
+├── pipeline.ts        # Pipeline orchestrator (170 lines, no step logic)
+├── workflow.ts        # Workflow profile engine
 ├── agent.ts           # OpenClaw integration (HTTP API + CLI fallback)
 ├── research.ts        # Research prompt builders
 ├── index.html         # Dashboard UI (single file)
 ├── thumbnail.html     # Playwright thumbnail template
-├── modal/             # Modal serverless scripts
+├── steps/             # Pipeline step plugins (add-on architecture)
+│   ├── index.ts       # Auto-discover step loader
+│   ├── types.ts       # PipelineStep interface (requires/provides contract)
+│   ├── helpers.ts     # Shared helpers (Modal, Whisper, SRT, env)
+│   ├── voice.ts       # TTS (ElevenLabs/Chatterbox/F5TTS)
+│   ├── images.ts      # AI images (Z-Image-Turbo batch)
+│   ├── lipsync.ts     # Lipsync (Modal LTX-2.3 chunked)
+│   ├── assembly.ts    # Video assembly (ffmpeg overlay)
+│   ├── captions.ts    # Captions (Whisper + fix typos + Playwright burn)
+│   └── thumbnail.ts   # Thumbnail (Playwright HTML)
+├── tools/             # Python caption tools (project copy)
+│   ├── animated_caption.py
+│   └── fix_caption_typos.py
+├── modal/             # Modal serverless GPU scripts
 │   ├── flux_image.py
 │   ├── lipsync.py
 │   ├── chatterbox_tts.py
 │   └── f5tts_thai.py
-├── workflows/         # Pipeline workflow templates (YAML)
-│   ├── full-video-thai.yaml
-│   └── slideshow.yaml
+├── workflows/         # Pipeline workflow profiles (YAML)
+│   └── full-video-thai.yaml
+├── channels/          # Per-channel assets (avatar, etc.) (gitignored)
 ├── output/            # Generated content (gitignored)
 └── data.db            # SQLite database (gitignored)
+```
+
+## Contributing Pipeline Steps
+
+ClawContent uses a **plugin architecture** for pipeline steps. Each step is an independent file in `steps/` that the engine auto-discovers.
+
+### Creating a New Step
+
+1. Create `steps/your-step.ts`:
+
+```typescript
+import type { PipelineStep, PipelineContext } from "./types";
+
+const step: PipelineStep = {
+  name: "your-step",
+  description: "What this step does",
+
+  // Contract: what context fields are needed and what this step produces
+  requires: ["voicePath"],           // MUST exist before this step runs
+  optionalRequires: ["lipsyncPath"], // Used if available
+  provides: ["yourOutputField"],     // What this step adds to context
+
+  async execute(contentId: number, ctx: PipelineContext): Promise<string> {
+    // Your step logic here
+    // Access ctx.voicePath, ctx.env, ctx.channel, etc.
+    // Return output file path
+    const outPath = `${ctx.outputDir}/your-output.mp4`;
+    // ... do work ...
+    return outPath;
+  },
+};
+
+export default step;
+```
+
+2. Add step name to workflow YAML:
+
+```yaml
+# workflows/full-video-thai.yaml
+steps:  # resolveSteps() determines order from profile config
+```
+
+3. Done — step auto-loads on server start.
+
+### Step Contract (requires/provides)
+
+Each step declares what it needs and what it produces:
+
+| Step | Requires | Provides |
+|------|----------|----------|
+| voice | scriptText | voicePath |
+| lipsync | voicePath | lipsyncPath |
+| images | scriptText | imagePaths |
+| assembly | voicePath + (lipsyncPath or imagePaths) | assembledPath |
+| captions | scriptText, assembledPath | captionsPath |
+| thumbnail | channel, content | — |
+
+Pipeline engine validates requirements before running each step. If a required field is missing, the step fails with a clear error.
+
+### Available Helpers
+
+Import from `./helpers`:
+
+```typescript
+// Modal GPU
+runModal(script, args)         // Run Modal script, return stdout
+parseModalOutput(stdout)       // Parse JSON from Modal output
+
+// Environment
+loadEnv()                      // Read API keys from DB + ~/.env
+
+// Script parsing
+stripScriptForTTS(markdown)    // Clean script for TTS
+parseScriptSections(text)      // Split by ## [timecode] headers
+extractAllImagePrompts(text)   // Extract all <!-- image: --> prompts
+
+// SRT/Captions
+whisperToSrt(data)             // Convert Whisper JSON to SRT
+buildSrt(sentences)            // Build SRT from sentence list
 ```
 
 ## Content Pipeline Flow
