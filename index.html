@@ -3,58 +3,75 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Content Dashboard</title>
+<title>ClawContent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    font-family: -apple-system, 'Sarabun', sans-serif;
+    font-family: 'Sarabun', -apple-system, sans-serif;
     background: #0d1117;
     color: #e6edf3;
     min-height: 100vh;
   }
   .header {
-    background: #161b22;
+    background: linear-gradient(135deg, #161b22 0%, #1c2333 100%);
     border-bottom: 1px solid #30363d;
-    padding: 16px 24px;
+    padding: 12px 24px;
     display: flex;
     align-items: center;
     justify-content: space-between;
   }
-  .header h1 { font-size: 20px; font-weight: 600; }
-  .header .subtitle { color: #8b949e; font-size: 13px; }
+  .header .logo { display: flex; align-items: center; gap: 10px; }
+  .header .logo-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: linear-gradient(135deg, #FF6600 0%, #FF8533 100%);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 700; color: white;
+  }
+  .header h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+  .header .subtitle { color: #6e7681; font-size: 11px; letter-spacing: 0.5px; }
   .layout {
     display: flex;
     height: calc(100vh - 57px);
   }
-  /* Sidebar — Channels */
+  /* Sidebar */
   .sidebar {
-    width: 260px;
+    width: 280px;
     background: #161b22;
     border-right: 1px solid #30363d;
     padding: 16px;
     overflow-y: auto;
   }
   .sidebar h3 {
-    font-size: 12px;
+    font-size: 11px;
     text-transform: uppercase;
-    color: #8b949e;
-    margin-bottom: 12px;
-    letter-spacing: 1px;
+    color: #6e7681;
+    margin-bottom: 10px;
+    letter-spacing: 1.5px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
   }
+  .sidebar h3 .add-btn {
+    font-size: 16px; color: #8b949e; cursor: pointer; line-height: 1;
+    border: none; background: none; padding: 0 4px;
+  }
+  .sidebar h3 .add-btn:hover { color: #58a6ff; }
   .channel-card {
     background: #21262d;
     border: 1px solid #30363d;
     border-radius: 8px;
-    padding: 12px;
-    margin-bottom: 8px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
     cursor: pointer;
-    transition: border-color 0.2s;
+    transition: all 0.15s;
   }
-  .channel-card:hover, .channel-card.active {
-    border-color: #58a6ff;
-  }
-  .channel-card .name { font-weight: 600; font-size: 14px; }
-  .channel-card .desc { color: #8b949e; font-size: 11px; margin-top: 4px; }
+  .channel-card:hover { border-color: #58a6ff; background: #262c36; }
+  .channel-card.active { border-color: #58a6ff; background: #1c2333; }
+  .channel-card .name { font-weight: 600; font-size: 13px; }
+  .channel-card .desc { color: #8b949e; font-size: 11px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .channel-card .counts {
     display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;
   }
@@ -74,10 +91,10 @@
     overflow-y: auto;
   }
   .toolbar {
-    display: flex; align-items: center; gap: 12px; margin-bottom: 20px;
+    display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
     flex-wrap: wrap;
   }
-  .toolbar h2 { font-size: 18px; flex: 1; }
+  .toolbar h2 { font-size: 17px; flex: 1; font-weight: 700; }
   .btn {
     padding: 8px 16px;
     border: 1px solid #30363d;
@@ -99,15 +116,17 @@
 
   /* Tabs */
   .tabs {
-    display: flex; gap: 0; margin-bottom: 20px;
+    display: flex; gap: 0; margin-bottom: 16px;
     border-bottom: 1px solid #30363d;
   }
   .tab {
-    padding: 8px 16px;
+    padding: 8px 14px;
     cursor: pointer;
-    color: #8b949e;
+    color: #6e7681;
     border-bottom: 2px solid transparent;
-    font-size: 14px;
+    font-size: 13px;
+    font-weight: 600;
+    transition: color 0.15s;
   }
   .tab:hover { color: #e6edf3; }
   .tab.active { color: #58a6ff; border-bottom-color: #58a6ff; }
@@ -193,10 +212,10 @@
 
   /* Empty state */
   .empty {
-    text-align: center; padding: 60px 20px; color: #8b949e;
+    text-align: center; padding: 80px 20px; color: #8b949e;
   }
-  .empty .icon { font-size: 48px; margin-bottom: 16px; }
-  .empty .text { font-size: 16px; }
+  .empty .icon { margin-bottom: 12px; }
+  .empty .text { font-size: 15px; }
 
   /* Loading */
   .loading { color: #8b949e; padding: 20px; text-align: center; }
@@ -248,24 +267,25 @@
 <body>
 
 <div class="header">
-  <div>
-    <h1>Content Dashboard</h1>
-    <div class="subtitle">Multi-channel content automation</div>
+  <div class="logo">
+    <div class="logo-icon">C</div>
+    <div>
+      <h1>ClawContent</h1>
+      <div class="subtitle">CONTENT AUTOMATION</div>
+    </div>
   </div>
-  <div style="display:flex;gap:8px;">
-    <button class="btn" onclick="addManualContent()">+ Add Content</button>
-    <button class="btn primary" onclick="openChannelModal()">+ Add Channel</button>
-    <button class="btn" onclick="openWorkflowEditor()" title="Create Workflow">+ Workflow</button>
-    <button class="btn" onclick="openSettingsModal()" title="Settings" style="font-size:16px;padding:6px 12px;">&#9881;</button>
+  <div style="display:flex;gap:6px;align-items:center;">
+    <button class="btn" onclick="addManualContent()" title="Add content manually">+ Content</button>
+    <button class="btn" onclick="openSettingsModal()" title="API Keys & Settings" style="font-size:15px;padding:6px 10px;">&#9881;</button>
   </div>
 </div>
 
 <div class="layout">
   <div class="sidebar">
-    <h3>Channels</h3>
+    <h3>Channels <button class="add-btn" onclick="openChannelModal()" title="Add Channel">+</button></h3>
     <div id="channel-list"></div>
 
-    <h3 style="margin-top:20px;">Workflows</h3>
+    <h3 style="margin-top:16px;">Workflows <button class="add-btn" onclick="openWorkflowEditor()" title="Create Workflow">+</button></h3>
     <div id="workflow-list"></div>
   </div>
 
@@ -300,8 +320,9 @@
 
     <div id="content-area">
       <div class="empty">
-        <div class="icon">📺</div>
-        <div class="text">Select a channel to get started</div>
+        <div class="icon" style="font-size:40px;opacity:0.4;">&#9654;</div>
+        <div class="text" style="font-size:15px;">Select a channel to get started</div>
+        <div style="color:#6e7681;font-size:12px;margin-top:8px;">or create a new one with the + button</div>
       </div>
     </div>
 
