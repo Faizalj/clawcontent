@@ -339,17 +339,24 @@ async function stepCaptions(contentId: number, ctx: PipelineContext): Promise<st
     console.log(`✅ SRT from script text: ${srtPath}`);
   }
 
-  // Step 2: Burn captions onto assembled video
+  // Step 2: Add captions to video
   if (existsSync(assembledVideo) && existsSync(srtPath)) {
+    // Try hard burn (requires libass in ffmpeg)
     try {
-      console.log("🔤 Burning captions onto video...");
+      console.log("🔤 Burning captions onto video (hard sub)...");
       await $`ffmpeg -y -i ${assembledVideo} -vf subtitles=${srtPath} -c:a copy ${captionedVideo}`.quiet();
-
-      // Replace final.mp4 with captioned version
       await $`mv ${captionedVideo} ${assembledVideo}`.quiet();
-      console.log(`✅ Captions burned into: ${assembledVideo}`);
-    } catch (err: any) {
-      console.warn(`⚠️  Burn captions failed: ${err.message} — SRT file still available`);
+      console.log(`✅ Hard captions burned into video`);
+    } catch {
+      // Fallback: embed soft subtitles (player can toggle on/off)
+      try {
+        console.log("🔤 Embedding soft subtitles (no libass)...");
+        await $`ffmpeg -y -i ${assembledVideo} -i ${srtPath} -c:v copy -c:a copy -c:s mov_text ${captionedVideo}`.quiet();
+        await $`mv ${captionedVideo} ${assembledVideo}`.quiet();
+        console.log(`✅ Soft subtitles embedded — enable in player`);
+      } catch (err: any) {
+        console.warn(`⚠️  Captions embed failed: ${err.message} — SRT file still available`);
+      }
     }
   }
 
