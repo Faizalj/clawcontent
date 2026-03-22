@@ -21,7 +21,7 @@ import {
 import { sendToAgent, parseAgentJson, getAgentList } from "./agent";
 import { buildResearchPrompt, buildScriptPrompt } from "./research";
 import { startPipeline, retryStep, loadEnv } from "./pipeline";
-import { getWorkflows, getWorkflow, saveWorkflow, deleteWorkflow } from "./workflow";
+import { getWorkflows, getWorkflow, saveWorkflow, deleteWorkflow, resolveSteps } from "./workflow";
 import { getSetting } from "./db";
 
 function resolveAgentId(channelAgentId?: string): string | null {
@@ -263,8 +263,11 @@ Bun.serve({
         id: w.id,
         name: w.name,
         description: w.description,
-        steps: w.steps.map((s) => s.name),
         source: w.source,
+        tts_provider: w.tts_provider,
+        language: w.language,
+        use_lipsync: w.use_lipsync,
+        steps: resolveSteps(w),
       }));
       return Response.json(workflows);
     }

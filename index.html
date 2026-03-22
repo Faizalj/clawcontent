@@ -395,14 +395,6 @@
       </div>
     </div>
     <div class="form-group">
-      <label>TTS Provider</label>
-      <select id="ch-tts">
-        <option value="elevenlabs">ElevenLabs (Thai voice clone, paid)</option>
-        <option value="chatterbox">Chatterbox (English clone, Modal)</option>
-        <option value="f5tts-thai">F5-TTS-THAI (Thai clone, Modal, free)</option>
-      </select>
-    </div>
-    <div class="form-group">
       <label>Avatar URL (for lipsync)</label>
       <input id="ch-avatar" placeholder="https://... real photo URL for lipsync">
     </div>
@@ -460,50 +452,45 @@
       <input id="wf-desc" placeholder="อธิบายสั้นๆ ว่า workflow นี้ใช้ทำอะไร">
     </div>
 
-    <!-- TAB: Visual -->
+    <!-- TAB: Visual (Production Profile) -->
     <div id="wf-panel-visual">
-      <label style="display:block;font-size:12px;color:#8b949e;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">Pipeline Steps</label>
-      <div style="display:flex;flex-direction:column;gap:8px;" id="wf-steps-list">
-        <label class="wf-step-row" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#21262d;border:1px solid #30363d;border-radius:6px;cursor:pointer;">
-          <input type="checkbox" id="wf-s-voice" checked>
-          <span style="font-size:15px;">🎙️</span>
-          <span style="flex:1;font-weight:600;font-size:13px;">Voice (TTS)</span>
-          <select id="wf-p-voice" style="width:180px;padding:4px 8px;font-size:12px;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#e6edf3;">
-            <option value="elevenlabs">ElevenLabs (Thai)</option>
-            <option value="chatterbox">Chatterbox (English)</option>
-            <option value="f5tts-thai">F5-TTS-THAI (Thai, free)</option>
+      <div style="display:flex;gap:12px;margin-bottom:12px;">
+        <div class="form-group" style="flex:1;margin-bottom:0;">
+          <label>Language</label>
+          <select id="wf-language" style="width:100%;padding:6px 10px;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#e6edf3;font-size:13px;">
+            <option value="th">Thai</option>
+            <option value="en">English</option>
           </select>
-        </label>
-        <label class="wf-step-row" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#21262d;border:1px solid #30363d;border-radius:6px;cursor:pointer;">
-          <input type="checkbox" id="wf-s-images" checked>
-          <span style="font-size:15px;">🖼️</span>
-          <span style="flex:1;font-weight:600;font-size:13px;">Images (Flux)</span>
-          <input id="wf-p-images-style" placeholder="image style prompt" style="width:180px;padding:4px 8px;font-size:12px;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#e6edf3;">
-        </label>
-        <label class="wf-step-row" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#21262d;border:1px solid #30363d;border-radius:6px;cursor:pointer;">
-          <input type="checkbox" id="wf-s-lipsync">
-          <span style="font-size:15px;">👤</span>
-          <span style="flex:1;font-weight:600;font-size:13px;">Lipsync (LTX-2.3)</span>
-          <span style="font-size:11px;color:#8b949e;">ต้องมี avatar URL</span>
-        </label>
-        <label class="wf-step-row" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#21262d;border:1px solid #30363d;border-radius:6px;cursor:pointer;">
-          <input type="checkbox" id="wf-s-captions" checked>
-          <span style="font-size:15px;">💬</span>
-          <span style="flex:1;font-weight:600;font-size:13px;">Captions (Whisper)</span>
-          <span style="font-size:11px;color:#8b949e;">local, free</span>
-        </label>
-        <label class="wf-step-row" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#21262d;border:1px solid #30363d;border-radius:6px;cursor:pointer;">
-          <input type="checkbox" id="wf-s-assembly" checked>
-          <span style="font-size:15px;">🎬</span>
-          <span style="flex:1;font-weight:600;font-size:13px;">Assembly (ffmpeg)</span>
-          <span style="font-size:11px;color:#8b949e;">local, free</span>
-        </label>
-        <label class="wf-step-row" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#21262d;border:1px solid #30363d;border-radius:6px;cursor:pointer;">
-          <input type="checkbox" id="wf-s-thumbnail" checked>
-          <span style="font-size:15px;">📸</span>
-          <span style="flex:1;font-weight:600;font-size:13px;">Thumbnail (Playwright)</span>
-          <span style="font-size:11px;color:#8b949e;">local, free</span>
-        </label>
+        </div>
+        <div class="form-group" style="flex:1;margin-bottom:0;">
+          <label>Duration</label>
+          <select id="wf-duration" style="width:100%;padding:6px 10px;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#e6edf3;font-size:13px;">
+            <option value="1min">1 min (shorts)</option>
+            <option value="3-4min" selected>3-4 min</option>
+            <option value="5-7min">5-7 min</option>
+            <option value="10min+">10 min+</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>TTS Provider</label>
+        <select id="wf-tts" style="width:100%;padding:6px 10px;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#e6edf3;font-size:13px;">
+          <option value="elevenlabs">ElevenLabs (Thai voice clone, paid)</option>
+          <option value="chatterbox">Chatterbox (English clone, Modal)</option>
+          <option value="f5tts-thai">F5-TTS-THAI (Thai clone, Modal, free)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Image Style</label>
+        <input id="wf-image-style" placeholder="e.g. cinematic photography, warm lighting, 16:9" style="font-size:13px;">
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:10px;">
+        <input type="checkbox" id="wf-lipsync">
+        <label style="margin-bottom:0;cursor:pointer;" onclick="document.getElementById('wf-lipsync').click()">Use Lipsync (ต้องมี avatar URL ใน channel)</label>
+      </div>
+      <div class="form-group">
+        <label>Script Instruction (optional)</label>
+        <input id="wf-script-instruction" placeholder="e.g. เน้นสูตรอาหารง่ายๆ ใช้ AI ช่วย" style="font-size:13px;">
       </div>
     </div>
 
@@ -1029,74 +1016,43 @@ function setWfTab(tab) {
   if (tab === 'yaml') syncVisualToYaml();
 }
 
-const WF_STEPS_DEF = [
-  { id: 'voice', providerField: 'select' },
-  { id: 'images', providerField: 'style' },
-  { id: 'lipsync', providerField: null },
-  { id: 'captions', providerField: null },
-  { id: 'assembly', providerField: null },
-  { id: 'thumbnail', providerField: null },
-];
-
-const WF_PROVIDERS = {
-  voice: 'elevenlabs', images: 'modal-flux', lipsync: 'modal-ltx',
-  captions: 'whisper-local', assembly: 'ffmpeg', thumbnail: 'playwright',
-};
-
 function syncVisualToYaml() {
   const name = document.getElementById('wf-name').value.trim() || 'My Workflow';
   const desc = document.getElementById('wf-desc').value.trim();
-  let yaml = `name: ${name}\n`;
-  if (desc) yaml += `description: "${desc}"\n`;
-  yaml += `steps:\n`;
+  const lang = document.getElementById('wf-language').value;
+  const dur = document.getElementById('wf-duration').value;
+  const tts = document.getElementById('wf-tts').value;
+  const imgStyle = document.getElementById('wf-image-style').value.trim();
+  const lipsync = document.getElementById('wf-lipsync').checked;
+  const scriptInst = document.getElementById('wf-script-instruction').value.trim();
 
-  for (const s of WF_STEPS_DEF) {
-    const checked = document.getElementById(`wf-s-${s.id}`).checked;
-    if (!checked) continue;
+  let y = `name: ${name}\n`;
+  if (desc) y += `description: "${desc}"\n`;
+  y += `\nlanguage: ${lang}\n`;
+  y += `video_duration: ${dur}\n`;
+  y += `script_format: ${dur === '1min' ? '2-section' : '4-section'}\n`;
+  y += `\ntts_provider: ${tts}\n`;
+  y += `tts_voice_id: ""\n`;
+  y += `image_style: "${imgStyle || 'professional illustration, modern, 16:9'}"\n`;
+  y += `use_lipsync: ${lipsync}\n`;
+  y += `\nthumbnail_style: gradient\n`;
+  y += `image_negative: "text, watermark, blurry"\n`;
+  if (scriptInst) y += `script_instruction: "${scriptInst}"\n`;
 
-    const provider = s.id === 'voice'
-      ? document.getElementById('wf-p-voice').value
-      : WF_PROVIDERS[s.id];
-
-    yaml += `  - name: ${s.id}\n    provider: ${provider}\n`;
-
-    if (s.id === 'images') {
-      const style = document.getElementById('wf-p-images-style').value.trim();
-      if (style) yaml += `    config:\n      style: "${style}"\n`;
-    }
-    if (s.id === 'voice' && provider === 'elevenlabs') {
-      yaml += `    config:\n      language: th\n`;
-    }
-  }
-
-  document.getElementById('wf-yaml').value = yaml;
+  document.getElementById('wf-yaml').value = y;
 }
 
 function syncYamlToVisual(yamlText) {
-  // Simple parse: extract steps from YAML text
-  const nameMatch = yamlText.match(/^name:\s*(.+)$/m);
-  const descMatch = yamlText.match(/^description:\s*"?(.+?)"?\s*$/m);
-  if (nameMatch) document.getElementById('wf-name').value = nameMatch[1].trim();
-  if (descMatch) document.getElementById('wf-desc').value = descMatch[1].trim();
+  const get = (key) => { const m = yamlText.match(new RegExp(`^${key}:\\s*"?(.+?)"?\\s*$`, 'm')); return m ? m[1].trim() : ''; };
 
-  // Reset all checkboxes
-  for (const s of WF_STEPS_DEF) {
-    document.getElementById(`wf-s-${s.id}`).checked = false;
-  }
-
-  // Parse steps
-  const stepMatches = yamlText.matchAll(/- name:\s*(\w+)\n\s*provider:\s*(\S+)/g);
-  for (const m of stepMatches) {
-    const stepId = m[1];
-    const provider = m[2];
-    const cb = document.getElementById(`wf-s-${stepId}`);
-    if (cb) cb.checked = true;
-    if (stepId === 'voice') document.getElementById('wf-p-voice').value = provider;
-  }
-
-  // Parse image style
-  const styleMatch = yamlText.match(/style:\s*"?([^"\n]+)"?/);
-  if (styleMatch) document.getElementById('wf-p-images-style').value = styleMatch[1].trim();
+  document.getElementById('wf-name').value = get('name');
+  document.getElementById('wf-desc').value = get('description');
+  document.getElementById('wf-language').value = get('language') || 'th';
+  document.getElementById('wf-duration').value = get('video_duration') || '3-4min';
+  document.getElementById('wf-tts').value = get('tts_provider') || 'elevenlabs';
+  document.getElementById('wf-image-style').value = get('image_style');
+  document.getElementById('wf-lipsync').checked = get('use_lipsync') === 'true';
+  document.getElementById('wf-script-instruction').value = get('script_instruction');
 }
 
 function openWorkflowEditor(editId = null) {
@@ -1126,15 +1082,13 @@ function openWorkflowEditor(editId = null) {
     document.getElementById('wf-desc').value = '';
     document.getElementById('wf-yaml').value = '';
     document.getElementById('wf-brief').value = '';
-    document.getElementById('wf-p-images-style').value = '';
     // Reset defaults
-    document.getElementById('wf-s-voice').checked = true;
-    document.getElementById('wf-s-images').checked = true;
-    document.getElementById('wf-s-lipsync').checked = false;
-    document.getElementById('wf-s-captions').checked = true;
-    document.getElementById('wf-s-assembly').checked = true;
-    document.getElementById('wf-s-thumbnail').checked = true;
-    document.getElementById('wf-p-voice').value = 'elevenlabs';
+    document.getElementById('wf-language').value = 'th';
+    document.getElementById('wf-duration').value = '3-4min';
+    document.getElementById('wf-tts').value = 'elevenlabs';
+    document.getElementById('wf-image-style').value = '';
+    document.getElementById('wf-lipsync').checked = false;
+    document.getElementById('wf-script-instruction').value = '';
   }
 
   modal.classList.add('visible');

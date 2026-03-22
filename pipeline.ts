@@ -12,7 +12,7 @@ import {
   deletePipelineJobs,
   getAllSettings,
 } from "./db";
-import { getWorkflow, type WorkflowStepConfig } from "./workflow";
+import { getWorkflow, resolveSteps, type WorkflowProfile } from "./workflow";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -28,7 +28,7 @@ interface PipelineContext {
   channel: any;
   content: any;
   env: Record<string, string>;
-  workflowSteps: WorkflowStepConfig[];
+  profile: WorkflowProfile | null;
 }
 
 type StepFn = (
@@ -152,8 +152,7 @@ function stripScriptForTTS(markdown: string): string {
 }
 
 async function stepVoice(contentId: number, ctx: PipelineContext): Promise<string> {
-  const wfStep = ctx.workflowSteps.find((s) => s.name === "voice");
-  const ttsProvider = wfStep?.provider || ctx.channel.tts_provider || "elevenlabs";
+  const ttsProvider = ctx.profile?.tts_provider || ctx.channel.tts_provider || "elevenlabs";
   const outPath = `${ctx.outputDir}/voice.mp3`;
   const ttsText = stripScriptForTTS(ctx.scriptText);
 
@@ -225,8 +224,7 @@ async function stepImages(contentId: number, ctx: PipelineContext): Promise<stri
     throw new Error("No sections found in script to generate images from");
   }
 
-  const wfStep = ctx.workflowSteps.find((s) => s.name === "images");
-  const imageStyle = wfStep?.config?.style || "professional digital illustration, modern, clean, vibrant colors, 16:9";
+  const imageStyle = ctx.profile?.image_style || "professional digital illustration, modern, clean, vibrant colors, 16:9";
 
   const paths: string[] = [];
 
@@ -555,20 +553,11 @@ export async function startPipeline(contentId: number): Promise<void> {
   const channel = getChannel(content.channel_id) as any;
   if (!channel) throw new Error(`Channel not found: ${content.channel_id}`);
 
-  // Resolve steps from workflow (preferred) or fallback to pipeline_steps
-  let steps: string[];
-  const workflowId = channel.workflow_id;
-  if (workflowId) {
-    const wf = getWorkflow(workflowId);
-    if (wf) {
-      steps = wf.steps.map((s) => s.name).filter((s) => IMPLEMENTED_STEPS.includes(s));
-    } else {
-      console.warn(`⚠️  Workflow "${workflowId}" not found, falling back to pipeline_steps`);
-      steps = JSON.parse(channel.pipeline_steps || "[]").filter((s: string) => IMPLEMENTED_STEPS.includes(s));
-    }
-  } else {
-    steps = JSON.parse(channel.pipeline_steps || "[]").filter((s: string) => IMPLEMENTED_STEPS.includes(s));
-  }
+  // Resolve steps from workflow profile
+  const profile = channel.workflow_id ? getWorkflow(channel.workflow_id) : null;
+  const steps = profile
+    ? resolveSteps(profile).filter((s) => IMPLEMENTED_STEPS.includes(s))
+    : JSON.parse(channel.pipeline_steps || "[]").filter((s: string) => IMPLEMENTED_STEPS.includes(s));
 
   if (steps.length === 0) {
     throw new Error("No implementable pipeline steps configured on channel");
@@ -597,8 +586,7 @@ export async function runPipeline(contentId: number): Promise<void> {
   const scriptText = script.approved_text || script.draft_text;
   if (!scriptText) throw new Error("No script text available");
 
-  // Load workflow config for step-level settings
-  const wf = channel.workflow_id ? getWorkflow(channel.workflow_id) : null;
+  const profile = channel.workflow_id ? getWorkflow(channel.workflow_id) : null;
 
   const ctx: PipelineContext = {
     outputDir: outputDirFor(content.channel_id, contentId),
@@ -610,7 +598,7 @@ export async function runPipeline(contentId: number): Promise<void> {
     channel,
     content,
     env: loadEnv(),
-    workflowSteps: wf?.steps || [],
+    profile,
   };
 
   const jobs = getPipelineJobs(contentId);

@@ -1,0 +1,16 @@
+# Shorts English — วิดีโอสั้น ภาษาอังกฤษ
+name: Shorts English
+description: "วิดีโอสั้น 1 นาที ภาษาอังกฤษ ไม่มี lipsync"
+
+language: en
+video_duration: 1min
+script_format: 2-section
+
+tts_provider: chatterbox
+tts_voice_id: ""
+image_style: "bold graphic design, eye-catching, social media style, 9:16 vertical"
+use_lipsync: false
+
+thumbnail_style: gradient
+image_negative: "text, watermark"
+script_instruction: "Keep it short and punchy. Two sections: hook + explanation."

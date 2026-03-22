@@ -1,10 +1,7 @@
 /**
- * Workflow engine — loads, parses, and manages pipeline workflow YAML configs.
- * Workflows define the steps, providers, and style config for content production.
- *
- * Sources:
- *   1. File-based: workflows/*.yaml (default/shared templates)
- *   2. DB-based: workflows table (user-created via dashboard)
+ * Workflow engine — production profiles that control how content is produced.
+ * Users configure style, providers, and resources.
+ * The system determines which pipeline steps to run automatically.
  */
 
 import yaml from "js-yaml";
@@ -15,19 +12,28 @@ import { db } from "./db";
 // Types
 // ---------------------------------------------------------------------------
 
-export interface WorkflowStepConfig {
-  name: string;
-  provider: string;
-  config?: Record<string, any>;
-}
-
-export interface Workflow {
+export interface WorkflowProfile {
   id: string;
   name: string;
   description: string;
-  steps: WorkflowStepConfig[];
   source: "file" | "db";
   raw_yaml?: string;
+
+  // Production config
+  language: string;
+  video_duration: string;
+  script_format: string;
+
+  // Provider config
+  tts_provider: string;
+  tts_voice_id: string;
+  image_style: string;
+  use_lipsync: boolean;
+
+  // Resources
+  thumbnail_style: string;
+  image_negative: string;
+  script_instruction: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -46,125 +52,90 @@ db.run(`
 `);
 
 // ---------------------------------------------------------------------------
-// File-based workflows
+// Parse YAML → WorkflowProfile
+// ---------------------------------------------------------------------------
+
+function parseWorkflow(id: string, raw: string, source: "file" | "db"): WorkflowProfile | null {
+  try {
+    const p = yaml.load(raw) as any;
+    if (!p || !p.name) return null;
+
+    return {
+      id,
+      name: p.name,
+      description: p.description || "",
+      source,
+      raw_yaml: raw,
+
+      language: p.language || "th",
+      video_duration: p.video_duration || "3-4min",
+      script_format: p.script_format || "4-section",
+
+      tts_provider: p.tts_provider || "elevenlabs",
+      tts_voice_id: p.tts_voice_id || "",
+      image_style: p.image_style || "professional illustration, modern, 16:9",
+      use_lipsync: p.use_lipsync !== false,
+
+      thumbnail_style: p.thumbnail_style || "gradient",
+      image_negative: p.image_negative || "",
+      script_instruction: p.script_instruction || "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Load from files + DB
 // ---------------------------------------------------------------------------
 
 const WORKFLOWS_DIR = `${import.meta.dir}/workflows`;
 
-function loadFileWorkflows(): Workflow[] {
+function loadFileWorkflows(): WorkflowProfile[] {
   if (!existsSync(WORKFLOWS_DIR)) return [];
 
-  const files = readdirSync(WORKFLOWS_DIR).filter(
-    (f) => f.endsWith(".yaml") || f.endsWith(".yml")
-  );
-
-  const workflows: Workflow[] = [];
-
-  for (const file of files) {
-    try {
-      const filePath = `${WORKFLOWS_DIR}/${file}`;
-      const raw = readFileSync(filePath, "utf-8");
-      const parsed = yaml.load(raw) as any;
-
-      if (!parsed || !parsed.name || !parsed.steps) continue;
-
-      const id = file.replace(/\.ya?ml$/, "");
-      workflows.push({
-        id,
-        name: parsed.name,
-        description: parsed.description || "",
-        steps: (parsed.steps || []).map((s: any) => ({
-          name: s.name,
-          provider: s.provider || "default",
-          config: s.config || {},
-        })),
-        source: "file",
-        raw_yaml: raw,
-      });
-    } catch (err) {
-      console.warn(`⚠️  Failed to parse workflow ${file}:`, err);
-    }
-  }
-
-  return workflows;
+  return readdirSync(WORKFLOWS_DIR)
+    .filter((f) => f.endsWith(".yaml") || f.endsWith(".yml"))
+    .map((f) => {
+      const raw = readFileSync(`${WORKFLOWS_DIR}/${f}`, "utf-8");
+      return parseWorkflow(f.replace(/\.ya?ml$/, ""), raw, "file");
+    })
+    .filter(Boolean) as WorkflowProfile[];
 }
 
-// ---------------------------------------------------------------------------
-// DB-based workflows
-// ---------------------------------------------------------------------------
-
-function loadDbWorkflows(): Workflow[] {
-  const rows = db
-    .query("SELECT * FROM workflows ORDER BY name")
-    .all() as any[];
-
-  return rows.map((row) => {
-    try {
-      const parsed = yaml.load(row.yaml_content) as any;
-      return {
-        id: row.id,
-        name: parsed?.name || row.name,
-        description: parsed?.description || row.description || "",
-        steps: (parsed?.steps || []).map((s: any) => ({
-          name: s.name,
-          provider: s.provider || "default",
-          config: s.config || {},
-        })),
-        source: "db" as const,
-        raw_yaml: row.yaml_content,
-      };
-    } catch {
-      return {
-        id: row.id,
-        name: row.name,
-        description: row.description || "",
-        steps: [],
-        source: "db" as const,
-        raw_yaml: row.yaml_content,
-      };
-    }
-  });
+function loadDbWorkflows(): WorkflowProfile[] {
+  const rows = db.query("SELECT * FROM workflows ORDER BY name").all() as any[];
+  return rows
+    .map((r) => parseWorkflow(r.id, r.yaml_content, "db"))
+    .filter(Boolean) as WorkflowProfile[];
 }
 
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
-export function getWorkflows(): Workflow[] {
+export function getWorkflows(): WorkflowProfile[] {
   return [...loadFileWorkflows(), ...loadDbWorkflows()];
 }
 
-export function getWorkflow(id: string): Workflow | null {
-  const all = getWorkflows();
-  return all.find((w) => w.id === id) || null;
+export function getWorkflow(id: string): WorkflowProfile | null {
+  return getWorkflows().find((w) => w.id === id) || null;
 }
 
 export function saveWorkflow(
   id: string,
   yamlContent: string
 ): { ok: boolean; error?: string } {
-  // Validate YAML
   try {
     const parsed = yaml.load(yamlContent) as any;
     if (!parsed || !parsed.name) {
       return { ok: false, error: "YAML must have a 'name' field" };
     }
-    if (!parsed.steps || !Array.isArray(parsed.steps) || parsed.steps.length === 0) {
-      return { ok: false, error: "YAML must have a non-empty 'steps' array" };
-    }
-    for (const step of parsed.steps) {
-      if (!step.name) {
-        return { ok: false, error: "Each step must have a 'name' field" };
-      }
-    }
-
-    const name = parsed.name;
-    const description = parsed.description || "";
 
     db.run(
       `INSERT OR REPLACE INTO workflows (id, name, description, yaml_content, updated_at)
        VALUES (?, ?, ?, ?, datetime('now'))`,
-      [id, name, description, yamlContent]
+      [id, parsed.name, parsed.description || "", yamlContent]
     );
 
     return { ok: true };
@@ -174,29 +145,23 @@ export function saveWorkflow(
 }
 
 export function deleteWorkflow(id: string): boolean {
-  // Only delete DB workflows, not file-based
-  const fileWorkflows = loadFileWorkflows();
-  if (fileWorkflows.find((w) => w.id === id)) {
-    return false; // Can't delete file-based workflows
-  }
-
+  if (loadFileWorkflows().find((w) => w.id === id)) return false;
   db.run("DELETE FROM workflows WHERE id = ?", [id]);
   return true;
 }
 
 /**
- * Get the step names from a workflow (for pipeline job creation)
+ * Determine which pipeline steps to run based on profile config.
+ * Steps are always in the correct order — users don't pick them.
  */
-export function getWorkflowStepNames(workflow: Workflow): string[] {
-  return workflow.steps.map((s) => s.name);
-}
+export function resolveSteps(profile: WorkflowProfile): string[] {
+  const steps: string[] = ["voice", "images"];
 
-/**
- * Get step config from workflow for a specific step
- */
-export function getStepConfig(
-  workflow: Workflow,
-  stepName: string
-): WorkflowStepConfig | null {
-  return workflow.steps.find((s) => s.name === stepName) || null;
+  if (profile.use_lipsync) {
+    steps.push("lipsync");
+  }
+
+  steps.push("captions", "assembly", "thumbnail");
+
+  return steps;
 }

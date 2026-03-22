@@ -1,28 +1,16 @@
-# Slideshow — วิดีโอจากรูปภาพ + เสียง ไม่มี lipsync
-# เหมาะกับ: content แบบ listicle, สรุปข่าว, เรื่องเล่า
-
+# Slideshow — รูปสไลด์ + เสียง ไม่มี lipsync
 name: Slideshow
-description: "วิดีโอสไลด์รูป + เสียงบรรยาย ไม่มี lipsync เร็วและประหยัด"
+description: "วิดีโอสไลด์รูป + เสียงบรรยาย เร็วและประหยัด"
 
-steps:
-  - name: voice
-    provider: elevenlabs
-    config:
-      language: th
-      voice_id: camsOHfnF030L7enGMzZ
-      model_id: eleven_v3
+language: th
+video_duration: 3-4min
+script_format: 4-section
 
-  - name: images
-    provider: modal-flux
-    config:
-      style: "cinematic photography, dramatic lighting, 16:9"
-      count: auto
+tts_provider: elevenlabs
+tts_voice_id: camsOHfnF030L7enGMzZ
+image_style: "cinematic photography, dramatic lighting, 16:9"
+use_lipsync: false
 
-  - name: captions
-    provider: whisper-local
-
-  - name: assembly
-    provider: ffmpeg
-
-  - name: thumbnail
-    provider: playwright
+thumbnail_style: gradient
+image_negative: "text, watermark, blurry"
+script_instruction: ""
