@@ -1211,7 +1211,6 @@ function openChannelModal(editId = null) {
         document.getElementById('ch-agent').value = ch.agent_id || '';
         document.getElementById('ch-research').value = ch.research_type || 'news';
         document.getElementById('ch-avatar').value = ch.avatar_url || '';
-        document.getElementById('ch-tts').value = ch.tts_provider || 'elevenlabs';
         document.getElementById('ch-workflow').value = ch.workflow_id || 'full-video-thai';
         document.getElementById('ch-color').value = ch.accent_color || '#FF6600';
       }
@@ -1228,7 +1227,6 @@ function openChannelModal(editId = null) {
     document.getElementById('ch-agent').value = '';
     document.getElementById('ch-research').value = 'news';
     document.getElementById('ch-avatar').value = '';
-    document.getElementById('ch-tts').value = 'elevenlabs';
     document.getElementById('ch-workflow').value = 'full-video-thai';
     document.getElementById('ch-color').value = '#FF6600';
   }
@@ -1253,7 +1251,6 @@ async function saveChannel() {
     research_type: document.getElementById('ch-research').value,
     workflow_id: document.getElementById('ch-workflow').value || 'full-video-thai',
     avatar_url: document.getElementById('ch-avatar').value,
-    tts_provider: document.getElementById('ch-tts').value,
     accent_color: document.getElementById('ch-color').value,
   });
 
