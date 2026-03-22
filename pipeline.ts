@@ -143,6 +143,7 @@ function stripScriptForTTS(markdown: string): string {
   return markdown
     .replace(/^#+\s*\[.*?\].*$/gm, "")      // ## [0:00 - 0:25] HOOK → remove entire line
     .replace(/^#+\s+.*$/gm, "")             // ## any heading → remove entire line
+    .replace(/<!--.*?-->/gs, "")            // <!-- image: ... --> → remove
     .replace(/\*\*/g, "")                    // **bold** → bold
     .replace(/\*/g, "")                      // *italic* → italic
     .replace(/\(.*?\)/g, "")                 // (stage directions) → remove
@@ -230,7 +231,11 @@ async function stepImages(contentId: number, ctx: PipelineContext): Promise<stri
   const paths: string[] = [];
 
   for (let i = 0; i < sections.length; i++) {
-    const visualPrompt = buildVisualPrompt(sections[i], ctx.channel.name, imageStyle);
+    // Use <!-- image: ... --> from script if available, otherwise fallback
+    const embeddedPrompt = extractImagePrompt(sections[i].body);
+    const visualPrompt = embeddedPrompt
+      ? `${imageStyle}. ${embeddedPrompt}`
+      : buildVisualPrompt(sections[i], ctx.channel.name, imageStyle);
     const imgPath = `${ctx.outputDir}/img_${i}.jpeg`;
 
     console.log(`🖼️  Generating image ${i + 1}/${sections.length} via Flux...`);
@@ -442,6 +447,14 @@ function parseScriptSections(text: string): { title: string; body: string }[] {
     sections.push({ title: "Main", body: text.trim() });
   }
   return sections;
+}
+
+/**
+ * Extract image prompt from <!-- image: ... --> in script section.
+ */
+function extractImagePrompt(body: string): string | null {
+  const match = body.match(/<!--\s*image:\s*(.*?)\s*-->/i);
+  return match ? match[1].trim() : null;
 }
 
 function buildVisualPrompt(

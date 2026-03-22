@@ -110,16 +110,23 @@ Format ช่อง: ${channel.description}
 
 โครงสร้าง script:
 ## [0:00 - 0:25] HOOK
+<!-- image: [describe the visual scene in English for AI image generation] -->
 (เปิดด้วยคำถาม/ข้อเท็จจริงที่น่าสนใจ)
 
 ## [0:25 - 1:15] อธิบาย
+<!-- image: [describe the visual scene in English] -->
 (อธิบายข่าว/concept ให้เข้าใจง่าย)
 
 ## [1:15 - 2:30] เกี่ยวกับคุณยังไง
+<!-- image: [describe the visual scene in English] -->
 (เชื่อมกับชีวิตจริง/ธุรกิจ)
 
 ## [2:30 - 3:30] สรุป + CTA
+<!-- image: [describe the visual scene in English] -->
 (สรุป 3-4 ข้อ + subscribe)
 
-เขียนเป็นภาษาไทย พูดง่าย ไม่ technical มาก ความยาวรวม ~3-4 นาที`;
+กฎสำคัญ:
+1. เขียนเป็นภาษาไทย พูดง่าย ไม่ technical มาก ความยาวรวม ~3-4 นาที
+2. ทุก section ต้องมี <!-- image: ... --> เป็นภาษาอังกฤษ อธิบายภาพที่เหมาะกับเนื้อหา
+3. image prompt ต้องละเอียด เช่น สี แสง อารมณ์ องค์ประกอบ style`;
 }
