@@ -7,3 +7,4 @@ output/
 MEMORY/
 .env
 .modal.toml
+avatar.*
