@@ -318,7 +318,16 @@ async function stepCaptions(contentId: number, ctx: PipelineContext): Promise<st
   const captionedVideo = `${ctx.outputDir}/final_captioned.mp4`;
 
   // Save script text as .md for fix_caption_typos.py
-  writeFileSync(scriptPath, ctx.scriptText, "utf-8");
+  // Strip image prompts + markdown before giving to fix_caption_typos
+  const cleanScript = ctx.scriptText
+    .replace(/<!--.*?-->/gs, "")
+    .replace(/^#+\s*\[.*?\].*$/gm, "")
+    .replace(/^#+\s+.*$/gm, "")
+    .replace(/\*\*/g, "")
+    .replace(/\*/g, "")
+    .replace(/\(.*?\)/g, "")
+    .trim();
+  writeFileSync(scriptPath, cleanScript, "utf-8");
 
   const audioSource = existsSync(assembledVideo) ? assembledVideo : ctx.voicePath;
   if (!audioSource) throw new Error("No audio source for captions");
