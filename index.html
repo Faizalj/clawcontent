@@ -893,11 +893,30 @@ async function refreshPipeline() {
             ${job.error ? esc(job.error) : STATUS_LABELS[job.status] || job.status}${elapsed ? ' — ' + elapsed : ''}
           </div>
           ${job.output_path && job.status === 'done' ? `<div class="step-detail">${esc(job.output_path)}</div>` : ''}
+          <div class="step-detail chunk-progress" data-step="${job.step}" data-content="${currentPipelineContentId}" style="display:none;"></div>
         </div>
         ${job.status === 'failed' || job.status === 'done' ? `<button class="btn" style="font-size:11px;padding:4px 8px;" onclick="retryPipelineStep(${currentPipelineContentId}, '${job.step}')">${job.status === 'failed' ? 'Retry' : 'Redo'}</button>` : ''}
       </div>
     `;
   }).join('');
+
+  // Show chunk progress for lipsync
+  for (const job of jobs) {
+    if (job.step === 'lipsync' && (job.status === 'running' || job.status === 'failed')) {
+      const chunkEl = container.querySelector(`.chunk-progress[data-step="lipsync"]`);
+      if (chunkEl) {
+        const chunkData = await api(`/api/lipsync-chunks/${currentPipelineContentId}`);
+        if (chunkData.total > 0) {
+          chunkEl.style.display = 'block';
+          const pct = Math.round((chunkData.done / chunkData.total) * 100);
+          chunkEl.innerHTML = `Chunks: ${chunkData.done}/${chunkData.total} (${pct}%) `
+            + `<span style="display:inline-block;width:100px;height:6px;background:#30363d;border-radius:3px;vertical-align:middle;">`
+            + `<span style="display:block;width:${pct}%;height:100%;background:${job.status === 'failed' ? '#f85149' : '#58a6ff'};border-radius:3px;"></span></span>`
+            + (job.status === 'failed' ? ' — retry will resume from here' : '');
+        }
+      }
+    }
+  }
 
   return jobs;
 }

@@ -22,6 +22,7 @@ import {
 } from "./db";
 import { sendToAgent, parseAgentJson, getAgentList } from "./agent";
 import { buildResearchPrompt, buildScriptPrompt } from "./research";
+import { existsSync } from "fs";
 import { startPipeline, retryStep, loadEnv } from "./pipeline";
 import { getWorkflows, getWorkflow, saveWorkflow, deleteWorkflow, resolveSteps } from "./workflow";
 import { getSetting } from "./db";
@@ -223,6 +224,37 @@ Bun.serve({
     if (taskStatusMatch && req.method === "GET") {
       const status = getTaskStatus(decodeURIComponent(taskStatusMatch[1]));
       return Response.json(status || { status: "idle", message: "" });
+    }
+
+    // GET /api/lipsync-chunks/:content_id — chunk progress
+    const chunksMatch = path.match(/^\/api\/lipsync-chunks\/(\d+)$/);
+    if (chunksMatch && req.method === "GET") {
+      const contentId = parseInt(chunksMatch[1]);
+      const content = getContentById(contentId) as any;
+      if (!content) return Response.json({ chunks: [], total: 0 });
+
+      const chunksDir = `${import.meta.dir}/output/${content.channel_id}/${contentId}/lipsync_chunks`;
+
+      if (!existsSync(chunksDir)) return Response.json({ chunks: [], total: 0 });
+
+      const voicePath = `${import.meta.dir}/output/${content.channel_id}/${contentId}/voice.mp3`;
+      let total = 0;
+      if (existsSync(voicePath)) {
+        try {
+          const durStr = require("child_process").execSync(
+            `ffprobe -v quiet -show_entries format=duration -of csv=p=0 "${voicePath}"`
+          ).toString().trim();
+          total = Math.ceil(parseFloat(durStr) / 20);
+        } catch {}
+      }
+
+      const { readdirSync, statSync } = require("fs");
+      const files = readdirSync(chunksDir).filter((f: string) => f.endsWith(".mp4"));
+      const done = files.filter((f: string) => {
+        try { return statSync(`${chunksDir}/${f}`).size > 50000; } catch { return false; }
+      });
+
+      return Response.json({ total, done: done.length, chunks: done.sort() });
     }
 
     // --- Settings ---
