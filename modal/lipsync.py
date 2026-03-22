@@ -180,7 +180,7 @@ def _submit_and_wait(workflow: dict, proc) -> bytes:
     return b""
 
 
-@app.function(image=image, gpu="A100-80GB", timeout=3600, volumes={"/models": volume}, secrets=[hf_secret])
+@app.function(image=image, gpu="A100-40GB", timeout=3600, volumes={"/models": volume}, secrets=[hf_secret])
 def generate_lipsync(audio_bytes: bytes, image_bytes: bytes, seed: int = 42) -> bytes:
     """Generate lipsync video from image bytes + audio bytes. Returns MP4 bytes."""
     import subprocess as sp
