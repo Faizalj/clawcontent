@@ -284,65 +284,24 @@ async function stepLipsync(contentId: number, ctx: PipelineContext): Promise<str
     throw new Error("Voice audio not available for lipsync");
   }
 
-  console.log("🎭 Starting lipsync via Modal LTX-2.3...");
+  console.log("🎭 Starting lipsync via Modal LTX-2.3 (chunked)...");
   const outPath = `${ctx.outputDir}/lipsync.mp4`;
-  const chunksDir = `${ctx.outputDir}/lipsync_chunks`;
-  mkdirSync(chunksDir, { recursive: true });
 
-  // Get audio duration
-  const durStr = await $`ffprobe -v quiet -show_entries format=duration -of csv=p=0 ${ctx.voicePath}`.text();
-  const totalDur = parseFloat(durStr.trim());
-  console.log(`🎵 Audio: ${totalDur.toFixed(1)}s`);
+  // modal run handles chunking internally:
+  // local_entrypoint splits audio ~20s → generate_lipsync.remote() per chunk → concat
+  const stdout = await runModal("lipsync.py", {
+    "audio-path": ctx.voicePath,
+    "image-path": avatarUrl,
+    "output-path": outPath,
+  });
 
-  const CHUNK_SIZE = 20; // seconds per chunk
-  const chunkVideos: string[] = [];
-  let start = 0;
-  let ci = 0;
-
-  while (start < totalDur) {
-    const length = Math.min(CHUNK_SIZE, totalDur - start);
-    const chunkAudio = `${chunksDir}/chunk_${ci}.mp3`;
-    const chunkVideo = `${chunksDir}/chunk_${ci}.mp4`;
-
-    // Split audio chunk
-    await $`ffmpeg -y -i ${ctx.voicePath} -ss ${start} -t ${length} -ar 44100 -ac 2 ${chunkAudio}`.quiet();
-
-    console.log(`  🎬 Chunk ${ci} (${start.toFixed(0)}s-${(start + length).toFixed(0)}s, ${length.toFixed(0)}s)...`);
-
-    // Send chunk to Modal
-    const stdout = await runModal("lipsync.py", {
-      "audio-path": chunkAudio,
-      "image-path": avatarUrl,
-      "output-path": chunkVideo,
-    });
-
-    const result = parseModalOutput(stdout);
-    if (result.status === "completed" && existsSync(chunkVideo)) {
-      chunkVideos.push(chunkVideo);
-      console.log(`  ✅ Chunk ${ci} done`);
-    } else {
-      console.error(`  ❌ Chunk ${ci} failed`);
-    }
-
-    start += CHUNK_SIZE;
-    ci++;
-  }
-
-  if (chunkVideos.length === 0) {
-    throw new Error("All lipsync chunks failed");
-  }
-
-  // Concat all chunks
-  if (chunkVideos.length === 1) {
-    await $`cp ${chunkVideos[0]} ${outPath}`.quiet();
-  } else {
-    const concatFile = `${chunksDir}/concat.txt`;
-    writeFileSync(concatFile, chunkVideos.map(f => `file '${f}'`).join("\n"), "utf-8");
-    await $`ffmpeg -y -f concat -safe 0 -i ${concatFile} -c copy ${outPath}`.quiet();
+  const result = parseModalOutput(stdout);
+  if (result.status !== "completed") {
+    throw new Error(`Lipsync failed: ${JSON.stringify(result)}`);
   }
 
   ctx.lipsyncPath = outPath;
-  console.log(`✅ Lipsync complete: ${chunkVideos.length} chunks → ${outPath}`);
+  console.log(`✅ Lipsync video saved: ${outPath}`);
   return outPath;
 }
 

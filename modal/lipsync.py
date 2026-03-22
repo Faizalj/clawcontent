@@ -217,20 +217,72 @@ def main(
     image_path: str = "avatar.jpg",
     output_path: str = "lipsync.mp4",
 ):
-    """Read local audio + image, send to Modal, save returned video."""
-    with open(audio_path, "rb") as f:
-        audio_bytes = f.read()
+    """Split audio into ~20s chunks, render each via Modal, concat locally."""
+    import subprocess as sp
+
     with open(image_path, "rb") as f:
         image_bytes = f.read()
 
-    print(f"Audio: {len(audio_bytes) / 1024:.0f}KB")
-    print(f"Image: {len(image_bytes) / 1024:.0f}KB")
+    # Get audio duration
+    dur = float(sp.run(
+        ["ffprobe", "-v", "quiet", "-show_entries", "format=duration", "-of", "csv=p=0", audio_path],
+        capture_output=True, text=True,
+    ).stdout.strip())
 
-    video_bytes = generate_lipsync.remote(audio_bytes, image_bytes)
+    print(f"Audio: {dur:.1f}s | Image: {len(image_bytes) / 1024:.0f}KB")
 
-    if video_bytes:
-        with open(output_path, "wb") as f:
-            f.write(video_bytes)
-        print(json.dumps({"status": "completed", "output_path": output_path}))
-    else:
+    CHUNK_SIZE = 20
+    chunk_videos = []
+    start = 0
+    ci = 0
+
+    while start < dur:
+        length = min(CHUNK_SIZE, dur - start)
+        chunk_audio = f"/tmp/lipsync_chunk_{ci}.mp3"
+
+        # Split audio chunk locally
+        sp.run([
+            "ffmpeg", "-y", "-i", audio_path,
+            "-ss", str(start), "-t", str(length),
+            "-ar", "44100", "-ac", "2", chunk_audio,
+        ], capture_output=True)
+
+        with open(chunk_audio, "rb") as f:
+            audio_bytes = f.read()
+
+        print(f"  Chunk {ci} ({start:.0f}s-{start+length:.0f}s, {length:.0f}s)...")
+
+        # Send to Modal — reuses same warm container
+        video_bytes = generate_lipsync.remote(audio_bytes, image_bytes, seed=42 + ci)
+
+        if video_bytes:
+            chunk_video = f"/tmp/lipsync_chunk_{ci}.mp4"
+            with open(chunk_video, "wb") as f:
+                f.write(video_bytes)
+            chunk_videos.append(chunk_video)
+            print(f"  ✅ Chunk {ci} done")
+        else:
+            print(f"  ❌ Chunk {ci} failed")
+
+        start += CHUNK_SIZE
+        ci += 1
+
+    if not chunk_videos:
         print(json.dumps({"status": "failed", "output_path": output_path}))
+        return
+
+    # Concat all chunks locally
+    if len(chunk_videos) == 1:
+        sp.run(["cp", chunk_videos[0], output_path])
+    else:
+        concat_file = "/tmp/lipsync_concat.txt"
+        with open(concat_file, "w") as f:
+            for cv in chunk_videos:
+                f.write(f"file '{cv}'\n")
+        sp.run([
+            "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+            "-i", concat_file, "-c", "copy", output_path,
+        ], capture_output=True)
+
+    print(f"✅ {len(chunk_videos)} chunks → {output_path}")
+    print(json.dumps({"status": "completed", "output_path": output_path}))
