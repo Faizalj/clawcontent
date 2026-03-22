@@ -144,9 +144,15 @@ function stripScriptForTTS(markdown: string): string {
     .replace(/^#+\s*\[.*?\].*$/gm, "")      // ## [0:00 - 0:25] HOOK → remove entire line
     .replace(/^#+\s+.*$/gm, "")             // ## any heading → remove entire line
     .replace(/<!--.*?-->/gs, "")            // <!-- image: ... --> → remove
+    .replace(/^[\*\-_]{3,}\s*$/gm, "")      // *** --- ___ horizontal rules → remove
     .replace(/\*\*/g, "")                    // **bold** → bold
     .replace(/\*/g, "")                      // *italic* → italic
     .replace(/\(.*?\)/g, "")                 // (stage directions) → remove
+    .replace(/```[\s\S]*?```/g, "")         // code blocks → remove
+    .replace(/`[^`]+`/g, "")                // inline code → remove
+    .replace(/^\s*[-•]\s*/gm, "")           // bullet points → remove marker
+    .replace(/^\s*\d+\.\s*/gm, "")          // numbered lists → remove number
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // [link text](url) → link text
     .replace(/\n{3,}/g, "\n\n")             // collapse multiple newlines
     .trim();
 }
