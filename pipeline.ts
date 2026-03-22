@@ -308,16 +308,17 @@ async function stepLipsync(contentId: number, ctx: PipelineContext): Promise<str
 // ---- CAPTIONS (local Whisper + fallback) ----
 
 async function stepCaptions(contentId: number, ctx: PipelineContext): Promise<string> {
-  const outPath = `${ctx.outputDir}/captions.srt`;
+  // Runs AFTER assembly — Whisper from assembled video → SRT → burn onto video
+  const srtPath = `${ctx.outputDir}/captions.srt`;
+  const assembledVideo = `${ctx.outputDir}/final.mp4`;
+  const captionedVideo = `${ctx.outputDir}/final_captioned.mp4`;
 
-  // Use assembled video if available (best timing), fallback to voice.mp3
-  const audioSource = existsSync(`${ctx.outputDir}/final.mp4`)
-    ? `${ctx.outputDir}/final.mp4`
-    : ctx.voicePath;
+  // Step 1: Whisper → SRT
+  const audioSource = existsSync(assembledVideo) ? assembledVideo : ctx.voicePath;
 
   if (audioSource) {
     try {
-      console.log(`🎤 Running Whisper on: ${audioSource.split("/").pop()}`);
+      console.log(`🎤 Whisper: ${audioSource.split("/").pop()}`);
       await $`whisper ${audioSource} --model turbo --output_format json --output_dir ${ctx.outputDir} --word_timestamps True`.quiet();
 
       const baseName = audioSource.split("/").pop()!.replace(/\.[^.]+$/, "");
@@ -325,32 +326,44 @@ async function stepCaptions(contentId: number, ctx: PipelineContext): Promise<st
 
       if (existsSync(whisperOut)) {
         const whisperData = JSON.parse(readFileSync(whisperOut, "utf-8"));
-        const srt = whisperToSrt(whisperData);
-        writeFileSync(outPath, srt, "utf-8");
-        ctx.captionsPath = outPath;
-        console.log(`✅ Captions from Whisper: ${outPath}`);
-        return outPath;
+        writeFileSync(srtPath, whisperToSrt(whisperData), "utf-8");
+        console.log(`✅ SRT from Whisper: ${srtPath}`);
       }
     } catch (err: any) {
-      console.warn(`⚠️  Whisper failed, falling back to script-based SRT: ${err.message}`);
+      console.warn(`⚠️  Whisper failed, using script-based SRT: ${err.message}`);
     }
   }
 
-  // Fallback: generate SRT from script text
-  const sentences = splitIntoSentences(ctx.scriptText);
-  const srt = buildSrt(sentences);
-  writeFileSync(outPath, srt, "utf-8");
-  ctx.captionsPath = outPath;
-  console.log(`✅ Captions from script text: ${outPath} (${sentences.length} entries)`);
-  return outPath;
+  // Fallback SRT from script text
+  if (!existsSync(srtPath)) {
+    writeFileSync(srtPath, buildSrt(splitIntoSentences(ctx.scriptText)), "utf-8");
+    console.log(`✅ SRT from script text: ${srtPath}`);
+  }
+
+  // Step 2: Burn captions onto assembled video
+  if (existsSync(assembledVideo) && existsSync(srtPath)) {
+    try {
+      console.log("🔤 Burning captions onto video...");
+      await $`ffmpeg -y -i ${assembledVideo} -vf subtitles=${srtPath} -c:a copy ${captionedVideo}`.quiet();
+
+      // Replace final.mp4 with captioned version
+      await $`mv ${captionedVideo} ${assembledVideo}`.quiet();
+      console.log(`✅ Captions burned into: ${assembledVideo}`);
+    } catch (err: any) {
+      console.warn(`⚠️  Burn captions failed: ${err.message} — SRT file still available`);
+    }
+  }
+
+  ctx.captionsPath = srtPath;
+  return srtPath;
 }
 
 // ---- ASSEMBLY (local ffmpeg) ----
 
 async function stepAssembly(contentId: number, ctx: PipelineContext): Promise<string> {
   const outPath = `${ctx.outputDir}/final.mp4`;
-  const hasLipsync = ctx.lipsyncPath && existsSync(ctx.lipsyncPath);
-  const hasImages = ctx.imagePaths.length > 0;
+  const hasLipsync = ctx.lipsyncPath && ctx.lipsyncPath.length > 0 && existsSync(ctx.lipsyncPath);
+  const hasImages = ctx.imagePaths.length > 0 && ctx.imagePaths.every(p => existsSync(p));
 
   if (hasLipsync && hasImages) {
     // Best case: lipsync (main) + images (insert) intercut
