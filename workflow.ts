@@ -155,13 +155,14 @@ export function deleteWorkflow(id: string): boolean {
  * Steps are always in the correct order — users don't pick them.
  */
 export function resolveSteps(profile: WorkflowProfile): string[] {
-  const steps: string[] = ["voice", "images"];
+  // Order: voice → lipsync (main video) → images (inserts) → assembly → captions → thumbnail
+  const steps: string[] = ["voice"];
 
   if (profile.use_lipsync) {
     steps.push("lipsync");
   }
 
-  steps.push("captions", "assembly", "thumbnail");
+  steps.push("images", "assembly", "captions", "thumbnail");
 
   return steps;
 }

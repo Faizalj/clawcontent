@@ -24,6 +24,7 @@ interface PipelineContext {
   voicePath: string | null;
   imagePaths: string[];
   lipsyncPath: string | null;
+  assembledPath: string | null;
   captionsPath: string | null;
   channel: any;
   content: any;
@@ -112,8 +113,16 @@ async function runModal(
   const cmd = `MODAL_TOKEN_ID=${tokenId} MODAL_TOKEN_SECRET=${tokenSecret} modal run ${MODAL_DIR}/${script} ${argList}`;
   console.log(`🔧 Modal: ${script} ${argList}`);
 
-  const result = await $`bash -c ${cmd}`.text();
-  return result.trim();
+  try {
+    const result = await $`bash -c ${cmd}`.text();
+    return result.trim();
+  } catch (err: any) {
+    const stderr = err.stderr?.toString() || "";
+    const stdout = err.stdout?.toString() || "";
+    const detail = stderr || stdout || err.message || "Unknown error";
+    console.error(`❌ Modal ${script} failed:`, detail.slice(0, 500));
+    throw new Error(`Modal ${script}: ${detail.slice(0, 300)}`);
+  }
 }
 
 /**
@@ -299,15 +308,17 @@ async function stepLipsync(contentId: number, ctx: PipelineContext): Promise<str
 async function stepCaptions(contentId: number, ctx: PipelineContext): Promise<string> {
   const outPath = `${ctx.outputDir}/captions.srt`;
 
-  // Try local Whisper first
-  if (ctx.voicePath) {
-    try {
-      console.log("🎤 Running local Whisper for captions...");
-      const whisperJsonPath = `${ctx.outputDir}/whisper.json`;
-      await $`whisper ${ctx.voicePath} --model turbo --output_format json --output_dir ${ctx.outputDir} --word_timestamps True`.quiet();
+  // Use assembled video if available (best timing), fallback to voice.mp3
+  const audioSource = existsSync(`${ctx.outputDir}/final.mp4`)
+    ? `${ctx.outputDir}/final.mp4`
+    : ctx.voicePath;
 
-      // Whisper outputs {voice}.json — find it
-      const baseName = ctx.voicePath.split("/").pop()!.replace(/\.[^.]+$/, "");
+  if (audioSource) {
+    try {
+      console.log(`🎤 Running Whisper on: ${audioSource.split("/").pop()}`);
+      await $`whisper ${audioSource} --model turbo --output_format json --output_dir ${ctx.outputDir} --word_timestamps True`.quiet();
+
+      const baseName = audioSource.split("/").pop()!.replace(/\.[^.]+$/, "");
       const whisperOut = `${ctx.outputDir}/${baseName}.json`;
 
       if (existsSync(whisperOut)) {
@@ -336,16 +347,44 @@ async function stepCaptions(contentId: number, ctx: PipelineContext): Promise<st
 
 async function stepAssembly(contentId: number, ctx: PipelineContext): Promise<string> {
   const outPath = `${ctx.outputDir}/final.mp4`;
+  const hasLipsync = ctx.lipsyncPath && existsSync(ctx.lipsyncPath);
+  const hasImages = ctx.imagePaths.length > 0;
 
-  if (ctx.lipsyncPath && existsSync(ctx.lipsyncPath)) {
-    console.log("🎬 Assembling: lipsync video + captions...");
-    if (ctx.captionsPath && existsSync(ctx.captionsPath)) {
-      await $`ffmpeg -y -i ${ctx.lipsyncPath} -vf subtitles=${ctx.captionsPath} -c:a copy ${outPath}`.quiet();
-    } else {
-      await $`cp ${ctx.lipsyncPath} ${outPath}`.quiet();
+  if (hasLipsync && hasImages) {
+    // Best case: lipsync (main) + images (insert) intercut
+    console.log("🎬 Assembling: lipsync (main) + image inserts...");
+
+    // Create image inserts as short clips (3s each)
+    const insertClips: string[] = [];
+    for (let i = 0; i < ctx.imagePaths.length; i++) {
+      const clipPath = `${ctx.outputDir}/insert_${i}.mp4`;
+      await $`ffmpeg -y -loop 1 -i ${ctx.imagePaths[i]} -c:v libx264 -t 3 -pix_fmt yuv420p -vf scale=1280:720 ${clipPath}`.quiet();
+      insertClips.push(clipPath);
     }
-  } else if (ctx.imagePaths.length > 0 && ctx.voicePath) {
-    console.log("🎬 Assembling: slideshow + voice + captions...");
+
+    // Build concat list: alternate lipsync segments + insert clips
+    // For now: lipsync is main, insert clips go between sections
+    // Simple approach: lipsync full + append insert clips at end as B-roll
+    const concatPath = `${ctx.outputDir}/assembly.txt`;
+    let concatContent = `file '${ctx.lipsyncPath}'\n`;
+    for (const clip of insertClips) {
+      concatContent += `file '${clip}'\n`;
+    }
+    writeFileSync(concatPath, concatContent, "utf-8");
+
+    // For V1: just use lipsync as main video (inserts need timeline editing — complex)
+    await $`cp ${ctx.lipsyncPath} ${outPath}`.quiet();
+
+    console.log(`📎 ${insertClips.length} insert clips ready in output dir for manual editing`);
+
+  } else if (hasLipsync) {
+    // Lipsync only, no inserts
+    console.log("🎬 Assembling: lipsync video only...");
+    await $`cp ${ctx.lipsyncPath} ${outPath}`.quiet();
+
+  } else if (hasImages && ctx.voicePath) {
+    // No lipsync — slideshow from images + voice
+    console.log("🎬 Assembling: slideshow + voice...");
 
     const concatPath = `${ctx.outputDir}/images.txt`;
     const dur = 3;
@@ -357,21 +396,17 @@ async function stepAssembly(contentId: number, ctx: PipelineContext): Promise<st
     const slideshowPath = `${ctx.outputDir}/slideshow.mp4`;
     await $`ffmpeg -y -f concat -safe 0 -i ${concatPath} -vsync vfr -pix_fmt yuv420p ${slideshowPath}`.quiet();
 
-    const combinedPath = `${ctx.outputDir}/combined.mp4`;
-    await $`ffmpeg -y -i ${slideshowPath} -i ${ctx.voicePath} -c:v copy -c:a aac -shortest ${combinedPath}`.quiet();
+    await $`ffmpeg -y -i ${slideshowPath} -i ${ctx.voicePath} -c:v copy -c:a aac -shortest ${outPath}`.quiet();
 
-    if (ctx.captionsPath && existsSync(ctx.captionsPath)) {
-      await $`ffmpeg -y -i ${combinedPath} -vf subtitles=${ctx.captionsPath} -c:a copy ${outPath}`.quiet();
-    } else {
-      await $`cp ${combinedPath} ${outPath}`.quiet();
-    }
   } else {
-    throw new Error("Assembly requires either lipsync video or images + voice audio");
+    throw new Error("Assembly requires lipsync video or images + voice audio");
   }
 
-  console.log(`✅ Final video assembled: ${outPath}`);
+  console.log(`✅ Video assembled: ${outPath}`);
   return outPath;
 }
+
+// ---- CAPTIONS (local Whisper + fallback) — now runs AFTER assembly ----
 
 // ---- THUMBNAIL (Playwright) ----
 
@@ -600,6 +635,7 @@ export async function runPipeline(contentId: number): Promise<void> {
     voicePath: null,
     imagePaths: [],
     lipsyncPath: null,
+    assembledPath: null,
     captionsPath: null,
     channel,
     content,
@@ -664,6 +700,7 @@ function populateContext(ctx: PipelineContext, step: string, outputPath: string)
       try { ctx.imagePaths = JSON.parse(outputPath); } catch { ctx.imagePaths = [outputPath]; }
       break;
     case "lipsync": ctx.lipsyncPath = outputPath || null; break;
+    case "assembly": ctx.assembledPath = outputPath; break;
     case "captions": ctx.captionsPath = outputPath; break;
   }
 }
