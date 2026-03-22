@@ -331,9 +331,11 @@
 
     <div class="script-panel" id="script-panel">
       <h3 id="script-title">Script</h3>
+      <div id="script-version" style="font-size:11px;color:#6e7681;margin-bottom:8px;"></div>
       <div class="script-text" id="script-text"></div>
       <div class="script-actions">
         <button class="btn success" onclick="approveScript()">Approve Script</button>
+        <button class="btn danger" onclick="regenerateScript()">Regenerate</button>
         <button class="btn" onclick="closeScript()">Close</button>
       </div>
     </div>
@@ -645,6 +647,7 @@ async function loadContent() {
         ` : ''}
         ${item.status === 'scripted' ? `
           <button class="btn" onclick="viewScript(${item.id}, '${item.title.replace(/'/g, "\\'")}')">View Script</button>
+          <button class="btn danger" onclick="regenerateScript(${item.id})" style="font-size:11px;padding:6px 10px;">Redo</button>
         ` : ''}
         ${item.status === 'script_approved' ? `
           <button class="btn primary" onclick="startProduction(${item.id})">Start Production</button>
@@ -736,6 +739,7 @@ async function viewScript(contentId, title) {
 
   const panel = document.getElementById('script-panel');
   document.getElementById('script-title').textContent = title;
+  document.getElementById('script-version').textContent = script.version ? `Version ${script.version}` : '';
   document.getElementById('script-text').textContent = script.draft_text || 'No script yet';
   panel.classList.add('visible');
 }
@@ -746,6 +750,32 @@ async function approveScript() {
   closeScript();
   loadChannels();
   loadContent();
+}
+
+async function regenerateScript(contentId) {
+  const id = contentId || currentScriptContentId;
+  if (!id) return;
+  if (!confirm('Regenerate script? จะสร้าง version ใหม่')) return;
+
+  closeScript();
+
+  // Set content back to approved so it can generate again
+  await api(`/api/content/${id}/approve`, 'POST');
+  await api(`/api/script/${id}/generate`, 'POST');
+
+  loadContent();
+
+  // Poll for new script
+  let polls = 0;
+  const interval = setInterval(async () => {
+    polls++;
+    const script = await api(`/api/script/${id}`);
+    if ((script && script.draft_text) || polls >= 24) {
+      clearInterval(interval);
+      loadChannels();
+      loadContent();
+    }
+  }, 5000);
 }
 
 function closeScript() {
