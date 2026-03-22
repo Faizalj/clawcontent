@@ -399,12 +399,15 @@ async function stepAssembly(contentId: number, ctx: PipelineContext): Promise<st
 
   } else if (hasImages && ctx.voicePath) {
     // No lipsync — slideshow from images + voice
-    console.log("🎬 Assembling: slideshow + voice...");
+    // Calculate duration per image to match voice length
+    const durStr = await $`ffprobe -v quiet -show_entries format=duration -of csv=p=0 ${ctx.voicePath}`.text();
+    const voiceDur = parseFloat(durStr.trim());
+    const durPerImage = Math.ceil(voiceDur / ctx.imagePaths.length);
+    console.log(`🎬 Assembling: slideshow (${ctx.imagePaths.length} images × ${durPerImage}s = ${voiceDur.toFixed(0)}s) + voice...`);
 
     const concatPath = `${ctx.outputDir}/images.txt`;
-    const dur = 3;
     const concatContent = ctx.imagePaths
-      .map((p) => `file '${p}'\nduration ${dur}`)
+      .map((p) => `file '${p}'\nduration ${durPerImage}`)
       .join("\n") + `\nfile '${ctx.imagePaths[ctx.imagePaths.length - 1]}'`;
     writeFileSync(concatPath, concatContent, "utf-8");
 
