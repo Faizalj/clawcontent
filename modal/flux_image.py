@@ -6,7 +6,7 @@
 # - Apache 2.0, ungated, no HuggingFace license needed
 # - 8 steps, fast inference
 # - Q8 on T4 (16GB) = 99% quality
-# GPU: T4 ($0.27/hr)
+# GPU: L40S (48GB VRAM — FP16 model needs ~16GB + overhead)
 
 import modal
 import os
@@ -33,7 +33,7 @@ image = (
 
 @app.function(
     image=image,
-    gpu="T4",
+    gpu="L40S",
     timeout=600,
     volumes={"/models": volume},
 )
