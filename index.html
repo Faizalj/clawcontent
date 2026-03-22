@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Content Dashboard</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, 'Sarabun', sans-serif;
+    background: #0d1117;
+    color: #e6edf3;
+    min-height: 100vh;
+  }
+  .header {
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .header h1 { font-size: 20px; font-weight: 600; }
+  .header .subtitle { color: #8b949e; font-size: 13px; }
+  .layout {
+    display: flex;
+    height: calc(100vh - 57px);
+  }
+  /* Sidebar — Channels */
+  .sidebar {
+    width: 260px;
+    background: #161b22;
+    border-right: 1px solid #30363d;
+    padding: 16px;
+    overflow-y: auto;
+  }
+  .sidebar h3 {
+    font-size: 12px;
+    text-transform: uppercase;
+    color: #8b949e;
+    margin-bottom: 12px;
+    letter-spacing: 1px;
+  }
+  .channel-card {
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .channel-card:hover, .channel-card.active {
+    border-color: #58a6ff;
+  }
+  .channel-card .name { font-weight: 600; font-size: 14px; }
+  .channel-card .desc { color: #8b949e; font-size: 11px; margin-top: 4px; }
+  .channel-card .counts {
+    display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;
+  }
+  .badge {
+    font-size: 11px; padding: 2px 8px; border-radius: 12px;
+    background: #30363d;
+  }
+  .badge.discovered { background: #1f6feb33; color: #58a6ff; }
+  .badge.approved { background: #23863633; color: #3fb950; }
+  .badge.scripted { background: #9e6a0333; color: #d29922; }
+  .badge.producing { background: #6e40c933; color: #bc8cff; }
+
+  /* Main content */
+  .main {
+    flex: 1;
+    padding: 24px;
+    overflow-y: auto;
+  }
+  .toolbar {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .toolbar h2 { font-size: 18px; flex: 1; }
+  .btn {
+    padding: 8px 16px;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    background: #21262d;
+    color: #e6edf3;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 0.2s;
+  }
+  .btn:hover { background: #30363d; }
+  .btn.primary { background: #1f6feb; border-color: #1f6feb; }
+  .btn.primary:hover { background: #388bfd; }
+  .btn.success { background: #238636; border-color: #238636; }
+  .btn.success:hover { background: #2ea043; }
+  .btn.danger { background: #da3633; border-color: #da3633; }
+  .btn.danger:hover { background: #f85149; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Tabs */
+  .tabs {
+    display: flex; gap: 0; margin-bottom: 20px;
+    border-bottom: 1px solid #30363d;
+  }
+  .tab {
+    padding: 8px 16px;
+    cursor: pointer;
+    color: #8b949e;
+    border-bottom: 2px solid transparent;
+    font-size: 14px;
+  }
+  .tab:hover { color: #e6edf3; }
+  .tab.active { color: #58a6ff; border-bottom-color: #58a6ff; }
+
+  /* Content cards */
+  .content-list { display: flex; flex-direction: column; gap: 8px; }
+  .content-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .content-card .info { flex: 1; }
+  .content-card .title { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+  .content-card .summary { color: #8b949e; font-size: 13px; line-height: 1.5; }
+  .content-card .meta {
+    display: flex; gap: 8px; margin-top: 8px; align-items: center;
+    font-size: 11px; color: #8b949e;
+  }
+  .content-card .actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .content-card .source { color: #58a6ff; text-decoration: none; font-size: 11px; }
+  .content-card .source:hover { text-decoration: underline; }
+
+  /* Script view */
+  .script-panel {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 20px;
+    display: none;
+  }
+  .script-panel.visible { display: block; }
+  .script-panel h3 { margin-bottom: 12px; }
+  .script-text {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 16px;
+    white-space: pre-wrap;
+    font-size: 14px;
+    line-height: 1.7;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+  .script-actions { margin-top: 12px; display: flex; gap: 8px; }
+
+  /* Modal */
+  .modal-overlay {
+    display: none;
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 100;
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.visible { display: flex; }
+  .modal {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 24px;
+    width: 480px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal h3 { margin-bottom: 16px; }
+  .form-group { margin-bottom: 14px; }
+  .form-group label {
+    display: block; font-size: 12px; color: #8b949e;
+    margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%; padding: 8px 12px;
+    background: #0d1117; border: 1px solid #30363d;
+    border-radius: 6px; color: #e6edf3; font-size: 14px;
+    font-family: inherit;
+  }
+  .form-group textarea { min-height: 60px; resize: vertical; }
+  .form-group select { appearance: auto; }
+  .modal-actions { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
+
+  /* Empty state */
+  .empty {
+    text-align: center; padding: 60px 20px; color: #8b949e;
+  }
+  .empty .icon { font-size: 48px; margin-bottom: 16px; }
+  .empty .text { font-size: 16px; }
+
+  /* Loading */
+  .loading { color: #8b949e; padding: 20px; text-align: center; }
+
+  /* Status filter */
+  .status-filters { display: flex; gap: 6px; }
+
+  /* Pipeline progress */
+  .pipeline-panel {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 16px;
+    display: none;
+  }
+  .pipeline-panel.visible { display: block; }
+  .pipeline-panel h3 { margin-bottom: 16px; font-size: 16px; }
+  .pipeline-steps { display: flex; flex-direction: column; gap: 8px; }
+  .pipeline-step {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px;
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+  }
+  .pipeline-step .step-icon {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; flex-shrink: 0;
+  }
+  .pipeline-step .step-icon.pending { background: #30363d; color: #8b949e; }
+  .pipeline-step .step-icon.running { background: #1f6feb44; color: #58a6ff; animation: pulse 1.5s infinite; }
+  .pipeline-step .step-icon.done { background: #23863644; color: #3fb950; }
+  .pipeline-step .step-icon.failed { background: #da363344; color: #f85149; }
+  .pipeline-step .step-icon.skipped { background: #30363d; color: #6e7681; }
+  .pipeline-step .step-info { flex: 1; }
+  .pipeline-step .step-name { font-weight: 600; font-size: 13px; }
+  .pipeline-step .step-detail { font-size: 11px; color: #8b949e; margin-top: 2px; }
+  .pipeline-step .step-time { font-size: 11px; color: #8b949e; }
+  .pipeline-step .step-error { font-size: 11px; color: #f85149; margin-top: 2px; }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Content Dashboard</h1>
+    <div class="subtitle">Multi-channel content automation</div>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <button class="btn" onclick="addManualContent()">+ Add Content</button>
+    <button class="btn primary" onclick="openChannelModal()">+ Add Channel</button>
+    <button class="btn" onclick="openWorkflowEditor()" title="Create Workflow">+ Workflow</button>
+    <button class="btn" onclick="openSettingsModal()" title="Settings" style="font-size:16px;padding:6px 12px;">&#9881;</button>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <h3>Channels</h3>
+    <div id="channel-list"></div>
+
+    <h3 style="margin-top:20px;">Workflows</h3>
+    <div id="workflow-list"></div>
+  </div>
+
+  <div class="main">
+    <div class="toolbar">
+      <h2 id="channel-title">Select a channel</h2>
+      <button class="btn primary" id="scan-btn" onclick="scanChannel()" disabled>
+        Scan News
+      </button>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" data-status="discovered" onclick="setTab(this)">
+        Discovered
+      </div>
+      <div class="tab" data-status="approved" onclick="setTab(this)">
+        Approved
+      </div>
+      <div class="tab" data-status="scripted" onclick="setTab(this)">
+        Scripted
+      </div>
+      <div class="tab" data-status="script_approved" onclick="setTab(this)">
+        Ready
+      </div>
+      <div class="tab" data-status="producing" onclick="setTab(this)">
+        Producing
+      </div>
+      <div class="tab" data-status="done" onclick="setTab(this)">
+        Done
+      </div>
+    </div>
+
+    <div id="content-area">
+      <div class="empty">
+        <div class="icon">📺</div>
+        <div class="text">Select a channel to get started</div>
+      </div>
+    </div>
+
+    <div class="script-panel" id="script-panel">
+      <h3 id="script-title">Script</h3>
+      <div class="script-text" id="script-text"></div>
+      <div class="script-actions">
+        <button class="btn success" onclick="approveScript()">Approve Script</button>
+        <button class="btn" onclick="closeScript()">Close</button>
+      </div>
+    </div>
+
+    <div class="pipeline-panel" id="pipeline-panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <h3 id="pipeline-title">Production Pipeline</h3>
+        <button class="btn" onclick="closePipeline()">Close</button>
+      </div>
+      <div class="pipeline-steps" id="pipeline-steps"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Channel Modal -->
+<div class="modal-overlay" id="channel-modal">
+  <div class="modal">
+    <h3 id="modal-title">Add Channel</h3>
+    <input type="hidden" id="ch-edit-mode" value="add">
+    <div class="form-group">
+      <label>Channel ID (english, no spaces)</label>
+      <input id="ch-id" placeholder="e.g. ai-cooking">
+    </div>
+    <div class="form-group">
+      <label>Channel Name</label>
+      <input id="ch-name" placeholder="e.g. AI Cooking Thai">
+    </div>
+    <div class="form-group">
+      <label>Description / Concept</label>
+      <textarea id="ch-desc" placeholder="อธิบาย concept ช่อง target audience"></textarea>
+    </div>
+    <div class="form-group">
+      <label>OpenClaw Agent</label>
+      <select id="ch-agent">
+        <option value="">-- Loading agents... --</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Research Type</label>
+      <select id="ch-research">
+        <option value="news">News (หาข่าว)</option>
+        <option value="idea">Ideas (หาไอเดีย)</option>
+        <option value="trend">Trends (หาเทรนด์)</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Workflow</label>
+      <select id="ch-workflow">
+        <option value="">-- Loading workflows... --</option>
+      </select>
+      <div style="font-size:11px;color:#6e7681;margin-top:4px;">
+        กำหนด production pipeline — <a href="#" onclick="event.preventDefault();openWorkflowEditor()" style="color:#58a6ff;">สร้าง workflow ใหม่</a>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>TTS Provider</label>
+      <select id="ch-tts">
+        <option value="elevenlabs">ElevenLabs (Thai voice clone, paid)</option>
+        <option value="chatterbox">Chatterbox (English clone, Modal)</option>
+        <option value="f5tts-thai">F5-TTS-THAI (Thai clone, Modal, free)</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Avatar URL (for lipsync)</label>
+      <input id="ch-avatar" placeholder="https://... real photo URL for lipsync">
+    </div>
+    <div class="form-group">
+      <label>Accent Color</label>
+      <input id="ch-color" type="color" value="#FF6600">
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeChannelModal()">Cancel</button>
+      <button class="btn danger" id="ch-delete-btn" style="display:none" onclick="deleteChannel()">Delete</button>
+      <button class="btn success" onclick="saveChannel()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal" style="width:520px;">
+    <h3>API Settings</h3>
+    <p style="color:#8b949e;font-size:13px;margin-bottom:16px;">ใส่ API keys ของคุณเพื่อใช้งาน production pipeline</p>
+    <div id="settings-fields"></div>
+    <div id="settings-status" style="font-size:12px;margin-top:8px;color:#3fb950;display:none;"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeSettingsModal()">Close</button>
+      <button class="btn success" onclick="saveSettings()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Workflow Editor Modal -->
+<div class="modal-overlay" id="workflow-modal">
+  <div class="modal" style="width:600px;">
+    <h3 id="wf-modal-title">Create Workflow</h3>
+
+    <!-- Tab switcher -->
+    <div style="display:flex;gap:0;border-bottom:1px solid #30363d;margin-bottom:16px;">
+      <div class="tab active" id="wf-tab-visual" onclick="setWfTab('visual')" style="cursor:pointer;padding:8px 16px;font-size:13px;">Visual</div>
+      <div class="tab" id="wf-tab-brief" onclick="setWfTab('brief')" style="cursor:pointer;padding:8px 16px;font-size:13px;">AI Brief</div>
+      <div class="tab" id="wf-tab-yaml" onclick="setWfTab('yaml')" style="cursor:pointer;padding:8px 16px;font-size:13px;">YAML</div>
+    </div>
+
+    <!-- Shared: Name + ID -->
+    <div style="display:flex;gap:12px;margin-bottom:14px;">
+      <div class="form-group" style="flex:1;margin-bottom:0;">
+        <label>Workflow Name</label>
+        <input id="wf-name" placeholder="e.g. AI Cooking Short">
+      </div>
+      <div class="form-group" style="width:180px;margin-bottom:0;">
+        <label>ID (auto)</label>
+        <input id="wf-id" placeholder="auto-generated" style="color:#8b949e;">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Description</label>
+      <input id="wf-desc" placeholder="อธิบายสั้นๆ ว่า workflow นี้ใช้ทำอะไร">
+    </div>
+
+    <!-- TAB: Visual -->
+    <div id="wf-panel-visual">
+      <label style="display:block;font-size:12px;color:#8b949e;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">Pipeline Steps</label>
+      <div style="display:flex;flex-direction:column;gap:8px;" id="wf-steps-list">
+        <label class="wf-step-row" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#21262d;border:1px solid #30363d;border-radius:6px;cursor:pointer;">
+          <input type="checkbox" id="wf-s-voice" checked>
+          <span style="font-size:15px;">🎙️</span>
+          <span style="flex:1;font-weight:600;font-size:13px;">Voice (TTS)</span>
+          <select id="wf-p-voice" style="width:180px;padding:4px 8px;font-size:12px;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#e6edf3;">
+            <option value="elevenlabs">ElevenLabs (Thai)</option>
+            <option value="chatterbox">Chatterbox (English)</option>
+            <option value="f5tts-thai">F5-TTS-THAI (Thai, free)</option>
+          </select>
+        </label>
+        <label class="wf-step-row" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#21262d;border:1px solid #30363d;border-radius:6px;cursor:pointer;">
+          <input type="checkbox" id="wf-s-images" checked>
+          <span style="font-size:15px;">🖼️</span>
+          <span style="flex:1;font-weight:600;font-size:13px;">Images (Flux)</span>
+          <input id="wf-p-images-style" placeholder="image style prompt" style="width:180px;padding:4px 8px;font-size:12px;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#e6edf3;">
+        </label>
+        <label class="wf-step-row" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#21262d;border:1px solid #30363d;border-radius:6px;cursor:pointer;">
+          <input type="checkbox" id="wf-s-lipsync">
+          <span style="font-size:15px;">👤</span>
+          <span style="flex:1;font-weight:600;font-size:13px;">Lipsync (LTX-2.3)</span>
+          <span style="font-size:11px;color:#8b949e;">ต้องมี avatar URL</span>
+        </label>
+        <label class="wf-step-row" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#21262d;border:1px solid #30363d;border-radius:6px;cursor:pointer;">
+          <input type="checkbox" id="wf-s-captions" checked>
+          <span style="font-size:15px;">💬</span>
+          <span style="flex:1;font-weight:600;font-size:13px;">Captions (Whisper)</span>
+          <span style="font-size:11px;color:#8b949e;">local, free</span>
+        </label>
+        <label class="wf-step-row" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#21262d;border:1px solid #30363d;border-radius:6px;cursor:pointer;">
+          <input type="checkbox" id="wf-s-assembly" checked>
+          <span style="font-size:15px;">🎬</span>
+          <span style="flex:1;font-weight:600;font-size:13px;">Assembly (ffmpeg)</span>
+          <span style="font-size:11px;color:#8b949e;">local, free</span>
+        </label>
+        <label class="wf-step-row" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#21262d;border:1px solid #30363d;border-radius:6px;cursor:pointer;">
+          <input type="checkbox" id="wf-s-thumbnail" checked>
+          <span style="font-size:15px;">📸</span>
+          <span style="flex:1;font-weight:600;font-size:13px;">Thumbnail (Playwright)</span>
+          <span style="font-size:11px;color:#8b949e;">local, free</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- TAB: AI Brief -->
+    <div id="wf-panel-brief" style="display:none;">
+      <div class="form-group">
+        <label>บรีฟ workflow ที่อยากได้</label>
+        <textarea id="wf-brief" style="min-height:100px;" placeholder="เช่น: ช่อง AI Cooking ทำวิดีโอสั้น 1 นาที เน้นรูปอาหารสวยๆ ไม่ต้อง lipsync ใช้เสียงภาษาไทย thumbnail สีส้มอุ่นๆ"></textarea>
+      </div>
+      <button class="btn primary" onclick="generateWorkflowFromBrief()" id="wf-brief-btn" style="width:100%;">Generate Workflow from Brief</button>
+      <div style="font-size:11px;color:#6e7681;margin-top:8px;">AI จะสร้าง workflow ให้ → ตรวจสอบแล้ว Save</div>
+    </div>
+
+    <!-- TAB: YAML -->
+    <div id="wf-panel-yaml" style="display:none;">
+      <div class="form-group">
+        <label>YAML (Advanced)</label>
+        <textarea id="wf-yaml" style="min-height:260px;font-family:monospace;font-size:13px;line-height:1.5;" placeholder="name: My Workflow
+description: ...
+steps:
+  - name: voice
+    provider: elevenlabs
+  - name: images
+    provider: modal-flux
+    config:
+      style: 'modern, colorful'"></textarea>
+      </div>
+    </div>
+
+    <div id="wf-error" style="color:#f85149;font-size:12px;display:none;margin-top:8px;margin-bottom:8px;"></div>
+    <div class="modal-actions" style="margin-top:16px;">
+      <button class="btn" onclick="closeWorkflowEditor()">Cancel</button>
+      <button class="btn danger" id="wf-delete-btn" style="display:none" onclick="deleteWorkflowAction()">Delete</button>
+      <button class="btn success" onclick="saveWorkflowAction()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentChannel = null;
+let currentStatus = 'discovered';
+let currentScriptContentId = null;
+
+async function api(path, method = 'GET', body = null) {
+  const opts = { method };
+  if (body) {
+    opts.headers = { 'Content-Type': 'application/json' };
+    opts.body = JSON.stringify(body);
+  }
+  const res = await fetch(path, opts);
+  return res.json();
+}
+
+function esc(str) {
+  if (!str) return '';
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function loadChannels() {
+  const channels = await api('/api/channels');
+  const list = document.getElementById('channel-list');
+  list.innerHTML = channels.map(ch => `
+    <div class="channel-card ${currentChannel === ch.id ? 'active' : ''}"
+         onclick="selectChannel('${ch.id}')"
+         style="border-left: 3px solid ${ch.accent_color}">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div class="name">${esc(ch.name)}</div>
+        <span style="cursor:pointer;font-size:12px;color:#8b949e;" onclick="event.stopPropagation();openChannelModal('${ch.id}')">edit</span>
+      </div>
+      <div class="desc">${esc(ch.description)}</div>
+      <div style="font-size:11px;color:#8b949e;margin-top:2px;">
+        ${(() => { const a = agentCache.find(x => x.id === ch.agent_id); return a ? `${esc(a.emoji || '')} ${esc(a.id)}` : 'no agent'; })()}
+        | ${esc(ch.research_type)} | ${esc(ch.workflow_id || 'none')}
+      </div>
+      <div class="counts">
+        ${ch.counts.discovered ? `<span class="badge discovered">${ch.counts.discovered} new</span>` : ''}
+        ${ch.counts.approved ? `<span class="badge approved">${ch.counts.approved} approved</span>` : ''}
+        ${ch.counts.scripted ? `<span class="badge scripted">${ch.counts.scripted} scripted</span>` : ''}
+        ${ch.counts.producing ? `<span class="badge producing">${ch.counts.producing} producing</span>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+async function selectChannel(id) {
+  currentChannel = id;
+  document.getElementById('scan-btn').disabled = false;
+
+  const channels = await api('/api/channels');
+  const ch = channels.find(c => c.id === id);
+  if (ch) {
+    document.getElementById('channel-title').textContent = ch.name;
+    document.getElementById('scan-btn').textContent =
+      ch.research_type === 'news' ? 'Scan News' :
+      ch.research_type === 'idea' ? 'Find Ideas' : 'Scan Trends';
+  }
+
+  loadChannels();
+  loadContent();
+}
+
+function setTab(el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  currentStatus = el.dataset.status;
+  loadContent();
+}
+
+async function loadContent() {
+  if (!currentChannel) return;
+
+  const area = document.getElementById('content-area');
+  area.innerHTML = '<div class="loading">Loading...</div>';
+
+  const items = await api(`/api/content?channel=${currentChannel}&status=${currentStatus}`);
+
+  if (items.length === 0) {
+    area.innerHTML = `
+      <div class="empty">
+        <div class="icon">${currentStatus === 'discovered' ? '🔍' : '📋'}</div>
+        <div class="text">No ${currentStatus} items</div>
+      </div>`;
+    return;
+  }
+
+  area.innerHTML = '<div class="content-list">' + items.map(item => `
+    <div class="content-card">
+      <div class="info">
+        <div class="title">${esc(item.title)}</div>
+        <div class="summary">${esc(item.summary)}</div>
+        <div class="meta">
+          <span class="badge ${item.status}">${item.status}</span>
+          <span>${item.type}</span>
+          <span>${new Date(item.created_at).toLocaleDateString('th-TH')}</span>
+          ${item.source_url ? `<a href="${item.source_url}" target="_blank" class="source">source</a>` : ''}
+        </div>
+      </div>
+      <div class="actions">
+        ${item.status === 'discovered' ? `
+          <button class="btn success" onclick="approveContent(${item.id})">Approve</button>
+          <button class="btn danger" onclick="rejectContent(${item.id})">Reject</button>
+        ` : ''}
+        ${item.status === 'approved' ? `
+          <button class="btn primary" onclick="generateScript(${item.id})">Generate Script</button>
+        ` : ''}
+        ${item.status === 'scripted' ? `
+          <button class="btn" onclick="viewScript(${item.id}, '${item.title.replace(/'/g, "\\'")}')">View Script</button>
+        ` : ''}
+        ${item.status === 'script_approved' ? `
+          <button class="btn primary" onclick="startProduction(${item.id})">Start Production</button>
+        ` : ''}
+        ${item.status === 'producing' || item.status === 'done' ? `
+          <button class="btn" onclick="viewPipeline(${item.id})">View Pipeline</button>
+        ` : ''}
+      </div>
+    </div>
+  `).join('') + '</div>';
+}
+
+async function scanChannel() {
+  if (!currentChannel) return;
+  const btn = document.getElementById('scan-btn');
+  btn.disabled = true;
+  btn.textContent = 'Scanning...';
+
+  await api(`/api/scan/${currentChannel}`, 'POST');
+
+  let polls = 0;
+  const interval = setInterval(async () => {
+    polls++;
+    await loadChannels();
+    await loadContent();
+    if (polls >= 12) {
+      clearInterval(interval);
+      btn.disabled = false;
+      btn.textContent = 'Scan News';
+    }
+  }, 5000);
+}
+
+async function approveContent(id) {
+  await api(`/api/content/${id}/approve`, 'POST');
+  loadChannels();
+  loadContent();
+}
+
+async function rejectContent(id) {
+  await api(`/api/content/${id}/reject`, 'POST');
+  loadChannels();
+  loadContent();
+}
+
+async function generateScript(id) {
+  await api(`/api/script/${id}/generate`, 'POST');
+  let polls = 0;
+  const interval = setInterval(async () => {
+    polls++;
+    const script = await api(`/api/script/${id}`);
+    if ((script && script.draft_text) || polls >= 24) {
+      clearInterval(interval);
+      loadChannels();
+      loadContent();
+    }
+  }, 5000);
+}
+
+async function viewScript(contentId, title) {
+  currentScriptContentId = contentId;
+  const script = await api(`/api/script/${contentId}`);
+
+  const panel = document.getElementById('script-panel');
+  document.getElementById('script-title').textContent = title;
+  document.getElementById('script-text').textContent = script.draft_text || 'No script yet';
+  panel.classList.add('visible');
+}
+
+async function approveScript() {
+  if (!currentScriptContentId) return;
+  await api(`/api/script/${currentScriptContentId}/approve`, 'POST');
+  closeScript();
+  loadChannels();
+  loadContent();
+}
+
+function closeScript() {
+  document.getElementById('script-panel').classList.remove('visible');
+  currentScriptContentId = null;
+}
+
+async function startProduction(id) {
+  if (!confirm('Start production pipeline? This will generate voice, images, lipsync, etc.')) return;
+  await api(`/api/production/${id}/start`, 'POST');
+  loadChannels();
+  loadContent();
+  viewPipeline(id);
+}
+
+let currentPipelineContentId = null;
+let pipelineInterval = null;
+
+const STEP_ICONS = {
+  voice: '🎙️', images: '🖼️', lipsync: '👤', captions: '💬',
+  assembly: '🎬', thumbnail: '📸', reel: '📱', seo: '🔍', upload: '📤',
+};
+const STEP_LABELS = {
+  voice: 'Voice (TTS)', images: 'AI Images', lipsync: 'Lipsync',
+  captions: 'Captions', assembly: 'Assembly', thumbnail: 'Thumbnail',
+  reel: 'Short Reel', seo: 'SEO Metadata', upload: 'Upload',
+};
+const STATUS_ICONS = {
+  pending: '⏳', running: '⚡', done: '✅', failed: '❌', skipped: '⏭️',
+};
+
+async function viewPipeline(contentId) {
+  currentPipelineContentId = contentId;
+  const panel = document.getElementById('pipeline-panel');
+  panel.classList.add('visible');
+  await refreshPipeline();
+
+  // Poll every 3 seconds
+  if (pipelineInterval) clearInterval(pipelineInterval);
+  pipelineInterval = setInterval(async () => {
+    const jobs = await refreshPipeline();
+    if (!jobs) return;
+    const allDone = jobs.length > 0 && jobs.every(j => ['done','failed','skipped'].includes(j.status));
+    if (allDone) {
+      clearInterval(pipelineInterval);
+      pipelineInterval = null;
+      loadChannels();
+      loadContent();
+    }
+  }, 3000);
+}
+
+async function refreshPipeline() {
+  if (!currentPipelineContentId) return null;
+  const jobs = await api(`/api/production/${currentPipelineContentId}`);
+  const container = document.getElementById('pipeline-steps');
+
+  if (jobs.length === 0) {
+    container.innerHTML = '<div style="color:#8b949e;padding:12px;">No pipeline jobs yet</div>';
+    return;
+  }
+
+  container.innerHTML = jobs.map(job => {
+    const elapsed = job.started_at && job.completed_at
+      ? Math.round((new Date(job.completed_at) - new Date(job.started_at)) / 1000) + 's'
+      : job.started_at && job.status === 'running'
+      ? Math.round((Date.now() - new Date(job.started_at + 'Z').getTime()) / 1000) + 's...'
+      : '';
+
+    return `
+      <div class="pipeline-step">
+        <div class="step-icon ${job.status}">${STATUS_ICONS[job.status] || '?'}</div>
+        <div class="step-info">
+          <div class="step-name">${STEP_ICONS[job.step] || '📦'} ${STEP_LABELS[job.step] || job.step}</div>
+          ${job.output_path ? `<div class="step-detail">${esc(job.output_path)}</div>` : ''}
+          ${job.error ? `<div class="step-error">${esc(job.error)}</div>` : ''}
+        </div>
+        <div class="step-time">${elapsed}</div>
+        ${job.status === 'failed' ? `<button class="btn" style="font-size:11px;padding:4px 8px;" onclick="retryPipelineStep(${currentPipelineContentId}, '${job.step}')">Retry</button>` : ''}
+      </div>
+    `;
+  }).join('');
+
+  return jobs;
+}
+
+async function retryPipelineStep(contentId, step) {
+  await api(`/api/production/${contentId}/retry/${step}`, 'POST');
+  refreshPipeline();
+}
+
+function closePipeline() {
+  document.getElementById('pipeline-panel').classList.remove('visible');
+  if (pipelineInterval) { clearInterval(pipelineInterval); pipelineInterval = null; }
+  currentPipelineContentId = null;
+}
+
+// --- Settings ---
+const SETTINGS_CONFIG = [
+  { key: 'MODAL_TOKEN_ID', label: 'Modal Token ID', placeholder: 'ak-...', link: 'https://modal.com/settings' },
+  { key: 'MODAL_TOKEN_SECRET', label: 'Modal Token Secret', placeholder: 'as-...', link: 'https://modal.com/settings' },
+  { key: 'ELEVENLABS_API_KEY', label: 'ElevenLabs API Key (optional)', placeholder: 'xi-...', link: 'https://elevenlabs.io/app/settings/api-keys' },
+];
+
+// Default Agent is handled separately (dropdown, not text input)
+
+async function openSettingsModal() {
+  const modal = document.getElementById('settings-modal');
+  const container = document.getElementById('settings-fields');
+  document.getElementById('settings-status').style.display = 'none';
+
+  container.innerHTML = '<div class="loading">Loading...</div>';
+  modal.classList.add('visible');
+
+  const settings = await api('/api/settings');
+
+  // Default Agent dropdown
+  const currentAgent = settings.find(s => s.key === 'DEFAULT_AGENT_ID');
+  const agentValue = currentAgent?.masked || '';
+  const agentHtml = `
+    <div class="form-group" style="border-bottom:1px solid #30363d;padding-bottom:14px;margin-bottom:14px;">
+      <label style="display:flex;justify-content:space-between;align-items:center;">
+        Default AI Agent
+        <span style="font-size:10px;color:${agentValue ? '#3fb950' : '#f85149'};text-transform:none;letter-spacing:0;">${agentValue ? 'Set' : 'Not set'}</span>
+      </label>
+      <select id="setting-DEFAULT_AGENT_ID" style="width:100%;padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;font-size:14px;">
+        <option value="">-- Select Agent --</option>
+        ${agentCache.map(a => `<option value="${a.id}" ${agentValue && agentValue.includes(a.id) ? 'selected' : ''}>${a.emoji ? a.emoji + ' ' : ''}${a.id} (${esc(a.name)})</option>`).join('')}
+      </select>
+      <div style="font-size:11px;color:#6e7681;margin-top:3px;">Agent หลักที่ใช้ scan news, สร้าง script, AI brief</div>
+    </div>
+  `;
+
+  container.innerHTML = agentHtml + SETTINGS_CONFIG.map(cfg => {
+    const s = settings.find(x => x.key === cfg.key);
+    const statusColor = !s || s.source === 'not-set' ? '#f85149' : '#3fb950';
+    const statusText = !s || s.source === 'not-set' ? 'Not set' : s.source === 'dashboard' ? 'Set (Dashboard)' : 'Set (.env file)';
+    return `
+      <div class="form-group">
+        <label style="display:flex;justify-content:space-between;align-items:center;">
+          ${esc(cfg.label)}
+          <span style="font-size:10px;color:${statusColor};text-transform:none;letter-spacing:0;">${statusText}</span>
+        </label>
+        <input id="setting-${cfg.key}" placeholder="${s && s.masked ? s.masked + ' (leave blank to keep)' : cfg.placeholder}" type="password">
+        <div style="font-size:11px;color:#6e7681;margin-top:3px;">
+          ${s && s.masked ? 'Current: ' + esc(s.masked) : ''}
+          ${cfg.link ? ` <a href="${cfg.link}" target="_blank" style="color:#58a6ff;">Get key</a>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function closeSettingsModal() {
+  document.getElementById('settings-modal').classList.remove('visible');
+}
+
+async function saveSettings() {
+  const entries = [
+    { key: 'DEFAULT_AGENT_ID', value: document.getElementById('setting-DEFAULT_AGENT_ID')?.value?.trim() || '' },
+    ...SETTINGS_CONFIG.map(cfg => ({
+      key: cfg.key,
+      value: document.getElementById(`setting-${cfg.key}`).value.trim(),
+    })),
+  ].filter(e => e.value);
+
+  if (entries.length === 0) {
+    closeSettingsModal();
+    return;
+  }
+
+  await api('/api/settings', 'POST', { settings: entries });
+
+  const status = document.getElementById('settings-status');
+  status.textContent = `Saved ${entries.length} key(s) successfully`;
+  status.style.display = 'block';
+
+  // Refresh the fields to show updated status
+  setTimeout(() => openSettingsModal(), 500);
+}
+
+// --- Workflows ---
+let workflowCache = [];
+let currentWfTab = 'visual';
+
+async function loadWorkflows() {
+  workflowCache = await api('/api/workflows');
+
+  // Update channel modal dropdown
+  const select = document.getElementById('ch-workflow');
+  if (select) {
+    select.innerHTML = workflowCache.map(w =>
+      `<option value="${esc(w.id)}">${esc(w.name)} (${w.steps.length} steps${w.source === 'file' ? ' — built-in' : ''})</option>`
+    ).join('');
+  }
+
+  // Update sidebar list
+  const list = document.getElementById('workflow-list');
+  if (list) {
+    list.innerHTML = workflowCache.map(w => `
+      <div class="channel-card" onclick="openWorkflowEditor('${esc(w.id)}')" style="border-left:3px solid ${w.source === 'file' ? '#30363d' : '#58a6ff'};">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div class="name" style="font-size:13px;">${esc(w.name)}</div>
+          <span style="font-size:10px;color:#8b949e;">${w.source === 'file' ? 'built-in' : 'custom'}</span>
+        </div>
+        <div class="desc">${esc(w.description)}</div>
+        <div style="font-size:11px;color:#8b949e;margin-top:4px;">
+          ${w.steps.map(s => STEP_ICONS[s] || '📦').join(' ')}
+          <span style="margin-left:4px;">${w.steps.length} steps</span>
+        </div>
+      </div>
+    `).join('');
+  }
+}
+
+function setWfTab(tab) {
+  currentWfTab = tab;
+  ['visual','brief','yaml'].forEach(t => {
+    document.getElementById(`wf-tab-${t}`).classList.toggle('active', t === tab);
+    document.getElementById(`wf-panel-${t}`).style.display = t === tab ? 'block' : 'none';
+  });
+  // Sync visual → YAML when switching to YAML tab
+  if (tab === 'yaml') syncVisualToYaml();
+}
+
+const WF_STEPS_DEF = [
+  { id: 'voice', providerField: 'select' },
+  { id: 'images', providerField: 'style' },
+  { id: 'lipsync', providerField: null },
+  { id: 'captions', providerField: null },
+  { id: 'assembly', providerField: null },
+  { id: 'thumbnail', providerField: null },
+];
+
+const WF_PROVIDERS = {
+  voice: 'elevenlabs', images: 'modal-flux', lipsync: 'modal-ltx',
+  captions: 'whisper-local', assembly: 'ffmpeg', thumbnail: 'playwright',
+};
+
+function syncVisualToYaml() {
+  const name = document.getElementById('wf-name').value.trim() || 'My Workflow';
+  const desc = document.getElementById('wf-desc').value.trim();
+  let yaml = `name: ${name}\n`;
+  if (desc) yaml += `description: "${desc}"\n`;
+  yaml += `steps:\n`;
+
+  for (const s of WF_STEPS_DEF) {
+    const checked = document.getElementById(`wf-s-${s.id}`).checked;
+    if (!checked) continue;
+
+    const provider = s.id === 'voice'
+      ? document.getElementById('wf-p-voice').value
+      : WF_PROVIDERS[s.id];
+
+    yaml += `  - name: ${s.id}\n    provider: ${provider}\n`;
+
+    if (s.id === 'images') {
+      const style = document.getElementById('wf-p-images-style').value.trim();
+      if (style) yaml += `    config:\n      style: "${style}"\n`;
+    }
+    if (s.id === 'voice' && provider === 'elevenlabs') {
+      yaml += `    config:\n      language: th\n`;
+    }
+  }
+
+  document.getElementById('wf-yaml').value = yaml;
+}
+
+function syncYamlToVisual(yamlText) {
+  // Simple parse: extract steps from YAML text
+  const nameMatch = yamlText.match(/^name:\s*(.+)$/m);
+  const descMatch = yamlText.match(/^description:\s*"?(.+?)"?\s*$/m);
+  if (nameMatch) document.getElementById('wf-name').value = nameMatch[1].trim();
+  if (descMatch) document.getElementById('wf-desc').value = descMatch[1].trim();
+
+  // Reset all checkboxes
+  for (const s of WF_STEPS_DEF) {
+    document.getElementById(`wf-s-${s.id}`).checked = false;
+  }
+
+  // Parse steps
+  const stepMatches = yamlText.matchAll(/- name:\s*(\w+)\n\s*provider:\s*(\S+)/g);
+  for (const m of stepMatches) {
+    const stepId = m[1];
+    const provider = m[2];
+    const cb = document.getElementById(`wf-s-${stepId}`);
+    if (cb) cb.checked = true;
+    if (stepId === 'voice') document.getElementById('wf-p-voice').value = provider;
+  }
+
+  // Parse image style
+  const styleMatch = yamlText.match(/style:\s*"?([^"\n]+)"?/);
+  if (styleMatch) document.getElementById('wf-p-images-style').value = styleMatch[1].trim();
+}
+
+function openWorkflowEditor(editId = null) {
+  const modal = document.getElementById('workflow-modal');
+  const titleEl = document.getElementById('wf-modal-title');
+  const deleteBtn = document.getElementById('wf-delete-btn');
+  document.getElementById('wf-error').style.display = 'none';
+  setWfTab('visual');
+
+  if (editId) {
+    titleEl.textContent = 'Edit Workflow';
+    deleteBtn.style.display = 'inline-block';
+    document.getElementById('wf-id').disabled = true;
+    api(`/api/workflows/${editId}`).then(wf => {
+      document.getElementById('wf-id').value = wf.id;
+      document.getElementById('wf-name').value = wf.name || '';
+      document.getElementById('wf-desc').value = wf.description || '';
+      document.getElementById('wf-yaml').value = wf.raw_yaml || '';
+      if (wf.raw_yaml) syncYamlToVisual(wf.raw_yaml);
+    });
+  } else {
+    titleEl.textContent = 'Create Workflow';
+    deleteBtn.style.display = 'none';
+    document.getElementById('wf-id').disabled = false;
+    document.getElementById('wf-id').value = '';
+    document.getElementById('wf-name').value = '';
+    document.getElementById('wf-desc').value = '';
+    document.getElementById('wf-yaml').value = '';
+    document.getElementById('wf-brief').value = '';
+    document.getElementById('wf-p-images-style').value = '';
+    // Reset defaults
+    document.getElementById('wf-s-voice').checked = true;
+    document.getElementById('wf-s-images').checked = true;
+    document.getElementById('wf-s-lipsync').checked = false;
+    document.getElementById('wf-s-captions').checked = true;
+    document.getElementById('wf-s-assembly').checked = true;
+    document.getElementById('wf-s-thumbnail').checked = true;
+    document.getElementById('wf-p-voice').value = 'elevenlabs';
+  }
+
+  modal.classList.add('visible');
+}
+
+function closeWorkflowEditor() {
+  document.getElementById('workflow-modal').classList.remove('visible');
+}
+
+function autoGenerateId() {
+  const name = document.getElementById('wf-name').value.trim();
+  if (name && !document.getElementById('wf-id').disabled) {
+    document.getElementById('wf-id').value = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40);
+  }
+}
+// Auto-generate ID from name
+document.addEventListener('DOMContentLoaded', () => {
+  const nameEl = document.getElementById('wf-name');
+  if (nameEl) nameEl.addEventListener('input', autoGenerateId);
+});
+
+async function saveWorkflowAction() {
+  const errEl = document.getElementById('wf-error');
+  errEl.style.display = 'none';
+
+  // Always sync visual → YAML before saving
+  if (currentWfTab === 'visual') syncVisualToYaml();
+
+  const id = document.getElementById('wf-id').value.trim();
+  const yamlContent = document.getElementById('wf-yaml').value;
+
+  if (!id) { errEl.textContent = 'Workflow Name required (generates ID)'; errEl.style.display = 'block'; return; }
+  if (!yamlContent.trim()) { errEl.textContent = 'No steps selected'; errEl.style.display = 'block'; return; }
+
+  const result = await api('/api/workflows', 'POST', { id, yaml_content: yamlContent });
+  if (result.error) {
+    errEl.textContent = result.error;
+    errEl.style.display = 'block';
+    return;
+  }
+
+  closeWorkflowEditor();
+  await loadWorkflows();
+
+  // Brief flash feedback — highlight new workflow in sidebar
+  const card = document.querySelector(`#workflow-list .channel-card`);
+  if (card) card.style.borderColor = '#3fb950';
+  setTimeout(() => { if (card) card.style.borderColor = ''; }, 2000);
+}
+
+async function deleteWorkflowAction() {
+  const id = document.getElementById('wf-id').value;
+  if (!confirm(`Delete workflow "${id}"?`)) return;
+  const result = await api(`/api/workflows/${id}`, 'DELETE');
+  if (result.error) { alert(result.error); return; }
+  closeWorkflowEditor();
+  await loadWorkflows();
+}
+
+async function generateWorkflowFromBrief() {
+  const brief = document.getElementById('wf-brief').value.trim();
+  if (!brief) return;
+
+  const btn = document.getElementById('wf-brief-btn');
+  btn.disabled = true;
+  btn.textContent = 'Generating...';
+
+  const result = await api('/api/workflows/generate', 'POST', { brief });
+
+  btn.disabled = false;
+  btn.textContent = 'Generate Workflow from Brief';
+
+  if (result.yaml) {
+    document.getElementById('wf-yaml').value = result.yaml;
+    syncYamlToVisual(result.yaml);
+    // Switch to visual tab to show result
+    setWfTab('visual');
+  } else if (result.error) {
+    const errEl = document.getElementById('wf-error');
+    errEl.textContent = result.error;
+    errEl.style.display = 'block';
+  }
+}
+
+async function addManualContent() {
+  if (!currentChannel) { alert('Select a channel first'); return; }
+  const title = prompt('Title:');
+  if (!title) return;
+  const summary = prompt('Summary (optional):') || '';
+  await api('/api/content/add', 'POST', {
+    channel_id: currentChannel,
+    type: 'manual',
+    title,
+    summary,
+  });
+  loadChannels();
+  loadContent();
+}
+
+// --- Channel Management ---
+function openChannelModal(editId = null) {
+  const modal = document.getElementById('channel-modal');
+  const titleEl = document.getElementById('modal-title');
+  const deleteBtn = document.getElementById('ch-delete-btn');
+  const idInput = document.getElementById('ch-id');
+
+  if (editId) {
+    // Edit mode — load channel data
+    titleEl.textContent = 'Edit Channel';
+    document.getElementById('ch-edit-mode').value = 'edit';
+    deleteBtn.style.display = 'inline-block';
+    idInput.disabled = true;
+
+    api('/api/channels').then(channels => {
+      const ch = channels.find(c => c.id === editId);
+      if (ch) {
+        idInput.value = ch.id;
+        document.getElementById('ch-name').value = ch.name;
+        document.getElementById('ch-desc').value = ch.description || '';
+        document.getElementById('ch-agent').value = ch.agent_id || '';
+        document.getElementById('ch-research').value = ch.research_type || 'news';
+        document.getElementById('ch-avatar').value = ch.avatar_url || '';
+        document.getElementById('ch-tts').value = ch.tts_provider || 'elevenlabs';
+        document.getElementById('ch-workflow').value = ch.workflow_id || 'full-video-thai';
+        document.getElementById('ch-color').value = ch.accent_color || '#FF6600';
+      }
+    });
+  } else {
+    // Add mode
+    titleEl.textContent = 'Add Channel';
+    document.getElementById('ch-edit-mode').value = 'add';
+    deleteBtn.style.display = 'none';
+    idInput.disabled = false;
+    idInput.value = '';
+    document.getElementById('ch-name').value = '';
+    document.getElementById('ch-desc').value = '';
+    document.getElementById('ch-agent').value = '';
+    document.getElementById('ch-research').value = 'news';
+    document.getElementById('ch-avatar').value = '';
+    document.getElementById('ch-tts').value = 'elevenlabs';
+    document.getElementById('ch-workflow').value = 'full-video-thai';
+    document.getElementById('ch-color').value = '#FF6600';
+  }
+
+  modal.classList.add('visible');
+}
+
+function closeChannelModal() {
+  document.getElementById('channel-modal').classList.remove('visible');
+}
+
+async function saveChannel() {
+  const id = document.getElementById('ch-id').value.trim();
+  const name = document.getElementById('ch-name').value.trim();
+  if (!id || !name) { alert('ID and Name required'); return; }
+
+  await api('/api/channels/save', 'POST', {
+    id,
+    name,
+    description: document.getElementById('ch-desc').value,
+    agent_id: document.getElementById('ch-agent').value || null,
+    research_type: document.getElementById('ch-research').value,
+    workflow_id: document.getElementById('ch-workflow').value || 'full-video-thai',
+    avatar_url: document.getElementById('ch-avatar').value,
+    tts_provider: document.getElementById('ch-tts').value,
+    accent_color: document.getElementById('ch-color').value,
+  });
+
+  closeChannelModal();
+  loadChannels();
+}
+
+async function deleteChannel() {
+  const id = document.getElementById('ch-id').value;
+  if (!confirm(`Delete channel "${id}" and all its content?`)) return;
+  await api(`/api/channels/${id}`, 'DELETE');
+  closeChannelModal();
+  currentChannel = null;
+  document.getElementById('channel-title').textContent = 'Select a channel';
+  document.getElementById('content-area').innerHTML = '<div class="empty"><div class="icon">📺</div><div class="text">Select a channel to get started</div></div>';
+  loadChannels();
+}
+
+// --- Load OpenClaw agents from gateway ---
+let agentCache = [];
+async function loadAgents() {
+  agentCache = await api('/api/agents');
+  const select = document.getElementById('ch-agent');
+  select.innerHTML = '<option value="">-- No agent --</option>' +
+    agentCache.map(a =>
+      `<option value="${a.id}">${a.emoji ? a.emoji + ' ' : ''}${a.id} (${a.name}${a.model ? ' — ' + a.model.split('/').pop() : ''})</option>`
+    ).join('');
+}
+
+// Initial load
+Promise.all([loadAgents(), loadWorkflows()]).then(() => loadChannels());
+</script>
+</body>
+</html>

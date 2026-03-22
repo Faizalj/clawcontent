@@ -1,0 +1,35 @@
+# Full Video Thai — วิดีโอเต็ม 3-4 นาที ภาษาไทย มี lipsync
+# เหมาะกับ: ช่อง YouTube ภาษาไทย, content อธิบาย/สอน
+
+name: Full Video Thai
+description: "วิดีโอเต็มรูปแบบ ภาษาไทย พร้อม voice clone, lipsync, captions"
+
+steps:
+  - name: voice
+    provider: elevenlabs
+    config:
+      language: th
+      voice_id: camsOHfnF030L7enGMzZ
+      model_id: eleven_v3
+
+  - name: images
+    provider: modal-flux
+    config:
+      style: "professional digital illustration, modern, clean, vibrant colors, 16:9"
+      count: auto
+
+  - name: lipsync
+    provider: modal-ltx
+
+  - name: captions
+    provider: whisper-local
+    config:
+      model: turbo
+
+  - name: assembly
+    provider: ffmpeg
+
+  - name: thumbnail
+    provider: playwright
+    config:
+      style: gradient

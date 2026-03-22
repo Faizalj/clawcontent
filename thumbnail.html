@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@700;800&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1280px;
+    height: 720px;
+    background: linear-gradient(135deg, {{BG_FROM}} 0%, {{BG_TO}} 100%);
+    font-family: 'Sarabun', sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .container {
+    width: 1200px;
+    height: 640px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 60px;
+    position: relative;
+  }
+  .channel-name {
+    font-size: 28px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.8);
+    margin-bottom: 20px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+  .title {
+    font-size: 72px;
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1.15;
+    text-shadow: 3px 3px 6px rgba(0,0,0,0.4);
+    max-width: 900px;
+  }
+  .accent-bar {
+    width: 120px;
+    height: 8px;
+    background: {{ACCENT}};
+    border-radius: 4px;
+    margin-top: 30px;
+  }
+  .ep-badge {
+    position: absolute;
+    top: 40px;
+    right: 60px;
+    background: {{ACCENT}};
+    color: #fff;
+    font-size: 24px;
+    font-weight: 800;
+    padding: 12px 24px;
+    border-radius: 12px;
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="channel-name">{{CHANNEL}}</div>
+    <div class="title">{{TITLE}}</div>
+    <div class="accent-bar"></div>
+    {{EP_BADGE}}
+  </div>
+</body>
+</html>

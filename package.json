@@ -1,0 +1,12 @@
+{
+  "name": "clawcontent",
+  "version": "1.0.0-beta",
+  "description": "Content automation dashboard — multi-channel video production pipeline",
+  "scripts": {
+    "dev": "bun run server.ts",
+    "start": "bun run server.ts"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.1"
+  }
+}
