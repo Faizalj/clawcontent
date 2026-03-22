@@ -372,12 +372,18 @@ async function stepCaptions(contentId: number, ctx: PipelineContext): Promise<st
     console.log(`🎨 Step 3: Burning captions via Playwright...`);
     try {
       const cp2 = require("child_process");
-      cp2.execFileSync("python3", [
+      const burnResult = cp2.spawnSync("python3", [
         `${CAPTION_TOOLS}/animated_caption.py`,
         "--transcript", transcriptForBurn,
         "--video", assembledVideo,
         "--output", captionedVideo,
-      ], { stdio: "inherit", timeout: 600000 });
+      ], { timeout: 600000, maxBuffer: 50 * 1024 * 1024 });
+
+      if (burnResult.stdout) console.log(burnResult.stdout.toString().slice(-500));
+      if (burnResult.status !== 0) {
+        const errMsg = burnResult.stderr?.toString()?.slice(-300) || "Unknown error";
+        throw new Error(`Playwright burn exit ${burnResult.status}: ${errMsg}`);
+      }
 
       if (existsSync(captionedVideo)) {
         await $`mv ${captionedVideo} ${assembledVideo}`.quiet();
