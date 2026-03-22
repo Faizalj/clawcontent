@@ -285,6 +285,28 @@ export function deletePipelineJobs(contentId: number) {
   db.run("DELETE FROM pipeline_jobs WHERE content_id = ?", [contentId]);
 }
 
+// --- Scan Status ---
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS scan_status (
+    channel_id TEXT PRIMARY KEY,
+    status TEXT DEFAULT 'idle',
+    message TEXT,
+    updated_at TEXT DEFAULT (datetime('now'))
+  )
+`);
+
+export function setScanStatus(channelId: string, status: string, message: string = "") {
+  db.run(
+    `INSERT OR REPLACE INTO scan_status (channel_id, status, message, updated_at) VALUES (?, ?, ?, datetime('now'))`,
+    [channelId, status, message]
+  );
+}
+
+export function getScanStatus(channelId: string) {
+  return db.query("SELECT * FROM scan_status WHERE channel_id = ?").get(channelId) as any;
+}
+
 // --- Settings Queries ---
 
 export function getSetting(key: string): string | null {

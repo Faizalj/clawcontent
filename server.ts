@@ -14,6 +14,8 @@ import {
   getPipelineJobs,
   getAllSettings,
   setSetting,
+  setScanStatus,
+  getScanStatus,
 } from "./db";
 import { sendToAgent, parseAgentJson, getAgentList } from "./agent";
 import { buildResearchPrompt, buildScriptPrompt } from "./research";
@@ -91,6 +93,8 @@ Bun.serve({
       const agentId = resolveAgentId(channel.agent_id);
       if (!agentId) return Response.json({ error: "No AI agent configured. Set Default Agent in Settings or assign agent to channel." }, { status: 400 });
 
+      setScanStatus(channelId, "scanning", `Scanning via agent ${agentId}...`);
+
       // Run in background
       (async () => {
         console.log(`🔍 Scanning for ${channel.name} via agent ${agentId}...`);
@@ -113,8 +117,10 @@ Bun.serve({
             }
           }
           console.log(`✅ Added ${added} items for ${channel.name}`);
+          setScanStatus(channelId, "done", `Found ${added} items`);
         } else {
           console.error(`❌ Agent failed:`, response.message);
+          setScanStatus(channelId, "error", response.message);
         }
       })();
 
@@ -194,6 +200,13 @@ Bun.serve({
         });
         return Response.json({ ok: true });
       })();
+    }
+
+    // GET /api/scan-status/:channel — poll scan progress
+    const scanStatusMatch = path.match(/^\/api\/scan-status\/(.+)$/);
+    if (scanStatusMatch && req.method === "GET") {
+      const status = getScanStatus(scanStatusMatch[1]);
+      return Response.json(status || { status: "idle", message: "" });
     }
 
     // --- Settings ---

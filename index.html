@@ -660,19 +660,45 @@ async function scanChannel() {
   btn.disabled = true;
   btn.textContent = 'Scanning...';
 
-  await api(`/api/scan/${currentChannel}`, 'POST');
+  const result = await api(`/api/scan/${currentChannel}`, 'POST');
 
-  let polls = 0;
+  // Check if scan was rejected (no agent, etc.)
+  if (result.error) {
+    btn.disabled = false;
+    btn.textContent = 'Scan News';
+    alert(result.error);
+    return;
+  }
+
+  // Poll scan status until done/error
   const interval = setInterval(async () => {
-    polls++;
-    await loadChannels();
-    await loadContent();
-    if (polls >= 12) {
+    const status = await api(`/api/scan-status/${currentChannel}`);
+
+    if (status.status === 'done') {
+      clearInterval(interval);
+      btn.disabled = false;
+      btn.textContent = status.message || 'Done!';
+      await loadChannels();
+      await loadContent();
+      setTimeout(() => { btn.textContent = 'Scan News'; }, 3000);
+    } else if (status.status === 'error') {
       clearInterval(interval);
       btn.disabled = false;
       btn.textContent = 'Scan News';
+      alert('Scan failed: ' + (status.message || 'Unknown error'));
+    } else {
+      btn.textContent = 'Scanning...';
     }
-  }, 5000);
+  }, 3000);
+
+  // Safety timeout — stop polling after 3 minutes
+  setTimeout(() => {
+    clearInterval(interval);
+    if (btn.disabled) {
+      btn.disabled = false;
+      btn.textContent = 'Scan News';
+    }
+  }, 180000);
 }
 
 async function approveContent(id) {
