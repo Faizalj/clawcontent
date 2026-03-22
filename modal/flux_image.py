@@ -16,6 +16,7 @@ volume = modal.Volume.from_name("zimage-models", create_if_missing=True)
 
 image = (
     modal.Image.debian_slim(python_version="3.12")
+    .apt_install("git")
     .pip_install(
         "git+https://github.com/huggingface/diffusers",
         "transformers",
