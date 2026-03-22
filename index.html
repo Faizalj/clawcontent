@@ -1063,7 +1063,7 @@ async function loadWorkflows() {
   const list = document.getElementById('workflow-list');
   if (list) {
     list.innerHTML = workflowCache.map(w => `
-      <div class="channel-card" onclick="openWorkflowEditor('${esc(w.id)}')" style="border-left:3px solid ${w.source === 'file' ? '#30363d' : '#58a6ff'};padding:8px 10px;">
+      <div class="channel-card" style="border-left:3px solid ${w.source === 'file' ? '#30363d' : '#58a6ff'};padding:8px 10px;cursor:default;">
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <div class="name" style="font-size:12px;">${esc(w.name)}</div>
           <span style="font-size:9px;color:#6e7681;background:#21262d;padding:1px 6px;border-radius:8px;">${w.steps.length} steps</span>
