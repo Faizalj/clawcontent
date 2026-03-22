@@ -8,3 +8,4 @@ MEMORY/
 .env
 .modal.toml
 channels/
+__pycache__/
