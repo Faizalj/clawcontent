@@ -101,7 +101,9 @@ Bun.serve({
         const response = await sendToAgent(agentId, prompt, 180);
 
         if (response.success) {
+          console.log(`📨 Agent raw response (first 500 chars):`, response.message.slice(0, 500));
           const items = parseAgentJson(response.message);
+          console.log(`📋 Parsed ${items.length} items from response`);
           let added = 0;
           for (const item of items) {
             if (item.title) {

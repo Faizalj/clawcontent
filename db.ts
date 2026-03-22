@@ -337,7 +337,7 @@ if (!existing) {
     name: "Builder with AI",
     description:
       "สอนเจ้าของธุรกิจใช้ AI เป็นระบบ — Personal AI, AI Agent, Data Sovereignty",
-    agent_id: "zen",
+    agent_id: "",
     research_type: "news",
     pipeline_steps: [
       "script",

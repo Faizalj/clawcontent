@@ -176,10 +176,14 @@ async function sendViaCli(
   timeout: number
 ): Promise<AgentResponse> {
   try {
-    console.log(`📡 Agent ${agentId} via CLI (one-shot, no session)`);
+    console.log(`📡 Agent ${agentId} via CLI`);
     const result = await $`openclaw agent --agent ${agentId} --message ${message} --json --timeout ${timeout}`.text();
 
-    return { success: true, message: result.trim(), raw: result };
+    // CLI with --json returns { runId, status, result: { payloads: [{ text }] } }
+    const text = extractAgentText(result.trim());
+    console.log(`✅ Agent ${agentId} responded (${text.length} chars)`);
+
+    return { success: true, message: text, raw: result };
   } catch (error: any) {
     const stderr = error.stderr?.toString() || "";
     const isNotFound = stderr.includes("not found") || stderr.includes("ENOENT")
@@ -192,6 +196,32 @@ async function sendViaCli(
         : error.message || "Agent communication failed",
       raw: stderr,
     };
+  }
+}
+
+/**
+ * Extract text from OpenClaw CLI JSON response.
+ * CLI returns: { result: { payloads: [{ text }] } } or plain text.
+ */
+function extractAgentText(raw: string): string {
+  try {
+    const data = JSON.parse(raw);
+    // OpenClaw CLI --json format
+    if (data.result?.payloads?.[0]?.text) {
+      return data.result.payloads[0].text;
+    }
+    // OpenAI format
+    if (data.choices?.[0]?.message?.content) {
+      return data.choices[0].message.content;
+    }
+    // Direct text field
+    if (data.text) return data.text;
+    if (data.message) return data.message;
+    // Fallback: stringify
+    return raw;
+  } catch {
+    // Not JSON — return as-is
+    return raw;
   }
 }
 
