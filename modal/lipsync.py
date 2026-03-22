@@ -217,30 +217,44 @@ def main(
     image_path: str = "avatar.jpg",
     output_path: str = "lipsync.mp4",
 ):
-    """Split audio into ~20s chunks, render each via Modal, concat locally."""
+    """Split audio into ~20s chunks, render each via Modal, concat locally.
+    Resumes from where it left off — skips chunks that already have video files."""
     import subprocess as sp
 
     with open(image_path, "rb") as f:
         image_bytes = f.read()
 
-    # Get audio duration
     dur = float(sp.run(
         ["ffprobe", "-v", "quiet", "-show_entries", "format=duration", "-of", "csv=p=0", audio_path],
         capture_output=True, text=True,
     ).stdout.strip())
 
-    print(f"Audio: {dur:.1f}s | Image: {len(image_bytes) / 1024:.0f}KB")
+    # Use output dir for chunks so they persist across retries
+    out_dir = os.path.dirname(os.path.abspath(output_path))
+    chunks_dir = os.path.join(out_dir, "lipsync_chunks")
+    os.makedirs(chunks_dir, exist_ok=True)
 
     CHUNK_SIZE = 20
+    total_chunks = int(dur / CHUNK_SIZE) + (1 if dur % CHUNK_SIZE > 0 else 0)
+    print(f"Audio: {dur:.1f}s | {total_chunks} chunks | Image: {len(image_bytes) / 1024:.0f}KB")
+
     chunk_videos = []
     start = 0
     ci = 0
 
     while start < dur:
         length = min(CHUNK_SIZE, dur - start)
-        chunk_audio = f"/tmp/lipsync_chunk_{ci}.mp3"
+        chunk_video = os.path.join(chunks_dir, f"chunk_{ci:02d}.mp4")
 
-        # Split audio chunk locally
+        # Skip if already rendered (resume support)
+        if os.path.exists(chunk_video) and os.path.getsize(chunk_video) > 50000:
+            print(f"  ⏭️  Chunk {ci} already done, skipping")
+            chunk_videos.append(chunk_video)
+            start += CHUNK_SIZE
+            ci += 1
+            continue
+
+        chunk_audio = os.path.join(chunks_dir, f"chunk_{ci:02d}.mp3")
         sp.run([
             "ffmpeg", "-y", "-i", audio_path,
             "-ss", str(start), "-t", str(length),
@@ -248,21 +262,23 @@ def main(
         ], capture_output=True)
 
         with open(chunk_audio, "rb") as f:
-            audio_bytes = f.read()
+            audio_bytes_chunk = f.read()
 
-        print(f"  Chunk {ci} ({start:.0f}s-{start+length:.0f}s, {length:.0f}s)...")
+        print(f"  🎬 Chunk {ci}/{total_chunks-1} ({start:.0f}s-{start+length:.0f}s, {length:.0f}s)...")
 
-        # Send to Modal — reuses same warm container
-        video_bytes = generate_lipsync.remote(audio_bytes, image_bytes, seed=42 + ci)
-
-        if video_bytes:
-            chunk_video = f"/tmp/lipsync_chunk_{ci}.mp4"
-            with open(chunk_video, "wb") as f:
-                f.write(video_bytes)
-            chunk_videos.append(chunk_video)
-            print(f"  ✅ Chunk {ci} done")
-        else:
-            print(f"  ❌ Chunk {ci} failed")
+        try:
+            video_bytes = generate_lipsync.remote(audio_bytes_chunk, image_bytes, seed=42 + ci)
+            if video_bytes:
+                with open(chunk_video, "wb") as f:
+                    f.write(video_bytes)
+                chunk_videos.append(chunk_video)
+                print(f"  ✅ Chunk {ci} done")
+            else:
+                print(f"  ❌ Chunk {ci} empty result")
+        except Exception as e:
+            print(f"  ❌ Chunk {ci} failed: {e}")
+            # Stop here — next retry will resume from this chunk
+            break
 
         start += CHUNK_SIZE
         ci += 1
