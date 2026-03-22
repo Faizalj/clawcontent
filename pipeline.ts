@@ -443,10 +443,20 @@ async function stepAssembly(contentId: number, ctx: PipelineContext): Promise<st
       console.log(`  📎 Insert ${i}: ${startTime}s-${endTime}s`);
     }
 
-    const inputArgs = insertClips.map(c => `-i ${c}`).join(" ");
-    const filterStr = filterParts.join("; ");
+    // Write filter to file to avoid shell escaping issues
+    const filterFile = `${ctx.outputDir}/overlay_filter.txt`;
+    writeFileSync(filterFile, filterParts.join(";\n"), "utf-8");
 
-    await $`bash -c ${"ffmpeg -y -i " + scaledLip + " " + inputArgs + ' -filter_complex "' + filterStr + '" -map "[vout]" -map 0:a -c:a copy -shortest ' + outPath}`.quiet();
+    // Build ffmpeg args array
+    const args = ["-y", "-i", scaledLip];
+    for (const clip of insertClips) {
+      args.push("-i", clip);
+    }
+    args.push("-filter_complex_script", filterFile);
+    args.push("-map", "[vout]", "-map", "0:a", "-c:a", "copy", "-shortest", outPath);
+
+    const { execSync } = require("child_process");
+    execSync(`ffmpeg ${args.map(a => `"${a}"`).join(" ")}`, { stdio: "pipe" });
 
     console.log(`✅ ${insertClips.length} inserts overlaid on lipsync`);
 
@@ -743,7 +753,8 @@ export async function runPipeline(contentId: number): Promise<void> {
       updatePipelineJob(job.id, { status: "done", output_path: outputPath, completed_at: new Date().toISOString() });
       populateContext(ctx, job.step, outputPath);
     } catch (err: any) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
+      const stderr = err.stderr?.toString?.() || "";
+      const errorMsg = (err instanceof Error ? err.message : String(err)) + (stderr ? ` | ${stderr.slice(0, 200)}` : "");
       console.error(`❌ Step ${job.step} failed: ${errorMsg}`);
       updatePipelineJob(job.id, { status: "failed", error: errorMsg, completed_at: new Date().toISOString() });
       return;
