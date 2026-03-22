@@ -95,7 +95,7 @@ function loadFileWorkflows(): WorkflowProfile[] {
   if (!existsSync(WORKFLOWS_DIR)) return [];
 
   return readdirSync(WORKFLOWS_DIR)
-    .filter((f) => f.endsWith(".yaml") || f.endsWith(".yml"))
+    .filter((f) => (f.endsWith(".yaml") || f.endsWith(".yml")) && !f.startsWith("_"))
     .map((f) => {
       const raw = readFileSync(`${WORKFLOWS_DIR}/${f}`, "utf-8");
       return parseWorkflow(f.replace(/\.ya?ml$/, ""), raw, "file");
