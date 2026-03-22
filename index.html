@@ -881,12 +881,13 @@ async function refreshPipeline() {
 
   container.innerHTML = jobs.map(job => {
     let elapsed = '';
+    const parseTs = (ts) => new Date(ts.includes('T') ? ts : ts + 'Z').getTime();
     if (job.started_at && job.completed_at) {
-      const ms = new Date(job.completed_at).getTime() - new Date(job.started_at).getTime();
-      elapsed = isNaN(ms) ? '' : Math.round(ms / 1000) + 's';
+      const ms = parseTs(job.completed_at) - parseTs(job.started_at);
+      elapsed = isNaN(ms) || ms < 0 ? '' : Math.round(ms / 1000) + 's';
     } else if (job.started_at && job.status === 'running') {
-      const ms = Date.now() - new Date(job.started_at).getTime();
-      elapsed = isNaN(ms) ? '' : Math.round(ms / 1000) + 's...';
+      const ms = Date.now() - parseTs(job.started_at);
+      elapsed = isNaN(ms) || ms < 0 ? '' : Math.round(ms / 1000) + 's...';
     }
 
     return `

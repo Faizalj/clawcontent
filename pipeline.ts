@@ -307,7 +307,7 @@ async function stepLipsync(contentId: number, ctx: PipelineContext): Promise<str
 // ---- CAPTIONS (Whisper → fix typos → Playwright burn) ----
 // Same process as PAI YouTubeVideo EP1-10
 
-const CAPTION_TOOLS = `${homedir()}/.claude/skills/YouTubeVideo/Tools`;
+const CAPTION_TOOLS = `${import.meta.dir}/tools`;
 
 async function stepCaptions(contentId: number, ctx: PipelineContext): Promise<string> {
   // Runs AFTER assembly
@@ -773,7 +773,7 @@ export async function runPipeline(contentId: number): Promise<void> {
       const output = await stepFn(contentId, ctx);
       const outputPath = Array.isArray(output) ? JSON.stringify(output) : output;
 
-      updatePipelineJob(job.id, { status: "done", output_path: outputPath, completed_at: new Date().toISOString() });
+      updatePipelineJob(job.id, { status: "done", output_path: outputPath, error: null, completed_at: new Date().toISOString() });
       populateContext(ctx, job.step, outputPath);
     } catch (err: any) {
       const stderr = err.stderr?.toString?.() || "";
