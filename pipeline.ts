@@ -234,21 +234,30 @@ async function voiceModal(script: string, text: string, outPath: string, referen
 // ---- IMAGES (Flux on Modal) ----
 
 async function stepImages(contentId: number, ctx: PipelineContext): Promise<string> {
-  const sections = parseScriptSections(ctx.scriptText);
-  if (sections.length === 0) {
-    throw new Error("No sections found in script to generate images from");
-  }
-
   const imageStyle = ctx.profile?.image_style || "professional digital illustration, modern, clean, vibrant colors, 16:9";
 
-  // Build all prompts + paths upfront
-  const batch = sections.map((section, i) => {
-    const embeddedPrompt = extractImagePrompt(section.body);
-    const prompt = embeddedPrompt
-      ? `${imageStyle}. ${embeddedPrompt}`
-      : buildVisualPrompt(section, ctx.channel.name, imageStyle);
-    return { prompt, path: `${ctx.outputDir}/img_${i}.jpeg` };
-  });
+  // Extract ALL <!-- image: --> prompts from script (not just per section)
+  const embeddedPrompts = extractAllImagePrompts(ctx.scriptText);
+
+  let batch: { prompt: string; path: string }[];
+
+  if (embeddedPrompts.length > 0) {
+    // Use embedded prompts from script (agent wrote them every 2-3 sentences)
+    batch = embeddedPrompts.map((p, i) => ({
+      prompt: `${imageStyle}. ${p}`,
+      path: `${ctx.outputDir}/img_${i}.jpeg`,
+    }));
+  } else {
+    // Fallback: generate from sections (old behavior)
+    const sections = parseScriptSections(ctx.scriptText);
+    if (sections.length === 0) {
+      throw new Error("No sections or image prompts found in script");
+    }
+    batch = sections.map((section, i) => ({
+      prompt: buildVisualPrompt(section, ctx.channel.name, imageStyle),
+      path: `${ctx.outputDir}/img_${i}.jpeg`,
+    }));
+  }
 
   console.log(`🖼️  Generating ${batch.length} images in one batch via Z-Image-Turbo...`);
 
@@ -605,6 +614,11 @@ function extractImagePrompt(body: string): string | null {
   return match ? match[1].trim() : null;
 }
 
+function extractAllImagePrompts(scriptText: string): string[] {
+  const matches = [...scriptText.matchAll(/<!--\s*image:\s*(.*?)\s*-->/gi)];
+  return matches.map(m => m[1].trim()).filter(Boolean);
+}
+
 function buildVisualPrompt(
   section: { title: string; body: string },
   channelName: string,
@@ -785,7 +799,7 @@ export async function runPipeline(contentId: number): Promise<void> {
   }
 
   if (getPipelineJobs(contentId).every((j: any) => j.status === "done")) {
-    updateContentStatus(contentId, "done");
+    updateContentStatus(contentId, "produced");
     console.log(`🎉 Pipeline complete for content ${contentId}`);
   }
 }

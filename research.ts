@@ -108,26 +108,18 @@ export function buildScriptPrompt(
 
 Format ช่อง: ${channel.description}
 
-โครงสร้าง script:
+โครงสร้าง script (4 sections):
 ## [0:00 - 0:25] HOOK
-<!-- image: [describe the visual scene in English for AI image generation] -->
-(เปิดด้วยคำถาม/ข้อเท็จจริงที่น่าสนใจ)
-
 ## [0:25 - 1:15] อธิบาย
-<!-- image: [describe the visual scene in English] -->
-(อธิบายข่าว/concept ให้เข้าใจง่าย)
-
 ## [1:15 - 2:30] เกี่ยวกับคุณยังไง
-<!-- image: [describe the visual scene in English] -->
-(เชื่อมกับชีวิตจริง/ธุรกิจ)
-
 ## [2:30 - 3:30] สรุป + CTA
-<!-- image: [describe the visual scene in English] -->
-(สรุป 3-4 ข้อ + subscribe)
 
 กฎสำคัญ:
 1. เขียนเป็นภาษาไทย พูดง่าย ไม่ technical มาก ความยาวรวม ~3-4 นาที
-2. ทุก section ต้องมี <!-- image: ... --> เป็นภาษาอังกฤษ อธิบายภาพที่เหมาะกับเนื้อหา
-3. image prompt ต้องละเอียด เช่น สี แสง อารมณ์ องค์ประกอบ style
-4. ห้ามใส่ metadata เช่น "ความยาว:", "โทน:", "หมายเหตุ:" ใน script — เขียนแค่บทพูดเท่านั้น`;
+2. ใส่ <!-- image: ... --> ทุกๆ 2-3 ประโยค (ประมาณ 10-15 จุดทั้ง script)
+   แต่ละ image prompt เป็นภาษาอังกฤษ อธิบายภาพที่เหมาะกับเนื้อหาตรงนั้น
+   เช่น <!-- image: A businessman looking at AI dashboard on laptop, modern office, warm lighting, 16:9 -->
+3. image prompt ต้องละเอียด: สี แสง อารมณ์ องค์ประกอบ style
+4. ห้ามใส่ metadata เช่น "ความยาว:", "โทน:", "หมายเหตุ:" — เขียนแค่บทพูดเท่านั้น
+5. เขียนแค่บทพูดกับ image prompts ไม่ต้องมีคำอธิบายอื่น`;
 }

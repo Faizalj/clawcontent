@@ -23,7 +23,7 @@ import {
 } from "./db";
 import { sendToAgent, parseAgentJson, getAgentList } from "./agent";
 import { buildResearchPrompt, buildScriptPrompt } from "./research";
-import { existsSync } from "fs";
+import { existsSync, readFileSync, writeFileSync } from "fs";
 import { startPipeline, retryStep, loadEnv } from "./pipeline";
 import { getWorkflows, getWorkflow, saveWorkflow, deleteWorkflow, resolveSteps } from "./workflow";
 import { getSetting } from "./db";
@@ -256,6 +256,134 @@ Bun.serve({
       });
 
       return Response.json({ total, done: done.length, chunks: done.sort() });
+    }
+
+    // --- Publishing ---
+
+    // POST /api/publish/:id/seo — generate SEO via agent
+    const seoMatch = path.match(/^\/api\/publish\/(\d+)\/seo$/);
+    if (seoMatch && req.method === "POST") {
+      const contentId = parseInt(seoMatch[1]);
+      const content = getContentById(contentId) as any;
+      if (!content) return Response.json({ error: "Content not found" }, { status: 404 });
+
+      const channel = getChannel(content.channel_id) as any;
+      const agentId = resolveAgentId(channel?.agent_id);
+
+      return (async () => {
+      if (agentId) {
+        const prompt = `สร้าง SEO metadata สำหรับ YouTube video:
+หัวข้อ: ${content.title}
+สรุป: ${content.summary}
+ช่อง: ${channel?.name}
+
+ตอบเป็น JSON:
+{"title": "หัวข้อที่ดึงดูด SEO friendly ไม่เกิน 60 ตัวอักษร", "description": "คำอธิบายดึงดูด SEO friendly 2-3 ย่อหน้า", "tags": "tag1, tag2, tag3, ..."}
+
+ตอบ JSON เท่านั้น`;
+
+        const response = await sendToAgent(agentId, prompt, 30);
+        if (response.success) {
+          try {
+            const jsonMatch = response.message.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              return Response.json(JSON.parse(jsonMatch[0]));
+            }
+          } catch {}
+        }
+      }
+
+      // Fallback: generate from content data
+      return Response.json({
+        title: content.title,
+        description: content.summary || "",
+        tags: "AI, เทคโนโลยี, ธุรกิจ",
+      });
+      })();
+    }
+
+    // POST /api/publish/:id/thumbnail — generate thumbnail
+    const thumbMatch = path.match(/^\/api\/publish\/(\d+)\/thumbnail$/);
+    if (thumbMatch && req.method === "POST") {
+      const contentId = parseInt(thumbMatch[1]);
+      const content = getContentById(contentId) as any;
+      if (!content) return Response.json({ error: "Content not found" }, { status: 404 });
+
+      const channel = getChannel(content.channel_id) as any;
+      const templatePath = `${import.meta.dir}/thumbnail.html`;
+      const outDir = `${import.meta.dir}/output/${content.channel_id}/${contentId}`;
+
+      if (existsSync(templatePath)) {
+        try {
+          let html = readFileSync(templatePath, "utf-8");
+          const accent = channel?.accent_color || "#FF6600";
+          html = html
+            .replace(/\{\{CHANNEL\}\}/g, channel?.name || "")
+            .replace(/\{\{TITLE\}\}/g, content.title)
+            .replace(/\{\{ACCENT\}\}/g, accent)
+            .replace(/\{\{BG_FROM\}\}/g, "#1a1a2e")
+            .replace(/\{\{BG_TO\}\}/g, accent + "88")
+            .replace(/\{\{EP_BADGE\}\}/g, "");
+
+          const tempHtml = `${outDir}/thumbnail_temp.html`;
+          const outPath = `${outDir}/thumbnail.png`;
+          writeFileSync(tempHtml, html, "utf-8");
+
+          const cp = require("child_process");
+          cp.execFileSync("npx", ["playwright", "screenshot", "--viewport-size", "1280,720", `file://${tempHtml}`, outPath], { stdio: "pipe", timeout: 30000 });
+
+          return Response.json({ ok: true, path: outPath });
+        } catch (err: any) {
+          return Response.json({ error: err.message }, { status: 500 });
+        }
+      }
+      return Response.json({ error: "Template not found" }, { status: 404 });
+    }
+
+    // POST /api/publish/:id — publish to platforms
+    const publishMatch = path.match(/^\/api\/publish\/(\d+)$/);
+    if (publishMatch && req.method === "POST") {
+      return (async () => {
+        const contentId = parseInt(publishMatch[1]);
+        const body = await req.json();
+
+        // TODO: implement actual upload to YouTube/TikTok/Reels
+        // For now: mark as published
+        updateContentStatus(contentId, "published");
+
+        return Response.json({
+          ok: true,
+          message: `Published! Platforms: ${body.platforms?.join(", ") || "none"} (auto-upload coming soon)`,
+        });
+      })();
+    }
+
+    // GET /api/publish/:id/download/:type — download files
+    const downloadMatch = path.match(/^\/api\/publish\/(\d+)\/download\/(.+)$/);
+    if (downloadMatch && req.method === "GET") {
+      const contentId = parseInt(downloadMatch[1]);
+      const type = downloadMatch[2];
+      const content = getContentById(contentId) as any;
+      if (!content) return new Response("Not found", { status: 404 });
+
+      const outDir = `${import.meta.dir}/output/${content.channel_id}/${contentId}`;
+      const fileMap: Record<string, string> = {
+        video: `${outDir}/final.mp4`,
+        thumbnail: `${outDir}/thumbnail.png`,
+        srt: `${outDir}/captions_fixed.json`,
+      };
+
+      const filePath = fileMap[type];
+      if (!filePath || !existsSync(filePath)) {
+        return new Response("File not found", { status: 404 });
+      }
+
+      const file = Bun.file(filePath);
+      return new Response(file, {
+        headers: {
+          "Content-Disposition": `attachment; filename="${type}_${contentId}.${filePath.split(".").pop()}"`,
+        },
+      });
     }
 
     // --- Settings ---

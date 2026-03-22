@@ -317,8 +317,11 @@
       <div class="tab" data-status="producing" onclick="setTab(this)">
         Producing
       </div>
-      <div class="tab" data-status="done" onclick="setTab(this)">
-        Done
+      <div class="tab" data-status="produced" onclick="setTab(this)">
+        Produced
+      </div>
+      <div class="tab" data-status="published" onclick="setTab(this)">
+        Published
       </div>
     </div>
 
@@ -427,6 +430,66 @@
     <div class="modal-actions">
       <button class="btn" onclick="closeSettingsModal()">Close</button>
       <button class="btn success" onclick="saveSettings()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Publish Modal -->
+<div class="modal-overlay" id="publish-modal">
+  <div class="modal" style="width:560px;">
+    <h3>Publish Video</h3>
+    <div id="publish-preview" style="margin-bottom:16px;"></div>
+
+    <div class="form-group">
+      <label>THUMBNAIL</label>
+      <div id="publish-thumbnail" style="background:#21262d;border-radius:8px;padding:12px;text-align:center;">
+        <div id="thumb-preview"></div>
+        <button class="btn" onclick="generateThumbnail()" id="thumb-btn" style="margin-top:8px;">Generate Thumbnail</button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>SEO — TITLE</label>
+      <input id="pub-title" placeholder="AI generated title...">
+    </div>
+    <div class="form-group">
+      <label>SEO — DESCRIPTION</label>
+      <textarea id="pub-desc" style="min-height:80px;" placeholder="AI generated description..."></textarea>
+    </div>
+    <div class="form-group">
+      <label>SEO — TAGS</label>
+      <input id="pub-tags" placeholder="AI, Agent, ธุรกิจ, เทคโนโลยี">
+    </div>
+
+    <div class="form-group">
+      <label>UPLOAD TO</label>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;text-transform:none;letter-spacing:0;">
+          <input type="checkbox" id="pub-youtube" checked> YouTube
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;text-transform:none;letter-spacing:0;">
+          <input type="checkbox" id="pub-tiktok"> TikTok
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;text-transform:none;letter-spacing:0;">
+          <input type="checkbox" id="pub-reels"> Facebook/IG Reels
+        </label>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>DOWNLOAD</label>
+      <div style="display:flex;gap:6px;">
+        <button class="btn" onclick="downloadFile('video')" id="dl-video-btn">Video (.mp4)</button>
+        <button class="btn" onclick="downloadFile('thumbnail')" id="dl-thumb-btn">Thumbnail (.png)</button>
+        <button class="btn" onclick="downloadFile('srt')" id="dl-srt-btn">Captions (.srt)</button>
+      </div>
+    </div>
+
+    <div id="pub-status" style="font-size:12px;color:#3fb950;display:none;margin-bottom:8px;"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closePublishModal()">Close</button>
+      <button class="btn" onclick="generateSEO()" id="seo-btn">Generate SEO</button>
+      <button class="btn success" onclick="publishContent()" id="publish-btn">Publish</button>
     </div>
   </div>
 </div>
@@ -653,8 +716,15 @@ async function loadContent() {
         ${item.status === 'script_approved' ? `
           <button class="btn primary" onclick="startProduction(${item.id})">Start Production</button>
         ` : ''}
-        ${item.status === 'producing' || item.status === 'done' ? `
+        ${item.status === 'producing' ? `
           <button class="btn" onclick="viewPipeline(${item.id})">View Pipeline</button>
+        ` : ''}
+        ${item.status === 'produced' ? `
+          <button class="btn" onclick="viewPipeline(${item.id})">Pipeline</button>
+          <button class="btn primary" onclick="openPublishModal(${item.id})">Publish</button>
+        ` : ''}
+        ${item.status === 'published' ? `
+          <span class="badge" style="background:#23863633;color:#3fb950;">Published</span>
         ` : ''}
       </div>
     </div>
@@ -959,6 +1029,106 @@ function closePipeline() {
   document.getElementById('pipeline-panel').classList.remove('visible');
   if (pipelineInterval) { clearInterval(pipelineInterval); pipelineInterval = null; }
   currentPipelineContentId = null;
+}
+
+// --- Publishing ---
+let currentPublishContentId = null;
+
+async function openPublishModal(contentId) {
+  currentPublishContentId = contentId;
+  const modal = document.getElementById('publish-modal');
+  modal.classList.add('visible');
+
+  // Load content info
+  const items = await api('/api/content');
+  const item = items.find(i => i.id === contentId);
+  if (item) {
+    document.getElementById('pub-title').value = item.title;
+    document.getElementById('pub-desc').value = item.summary || '';
+    document.getElementById('pub-tags').value = '';
+  }
+
+  // Check if thumbnail exists
+  const channels = await api('/api/channels');
+  const ch = channels.find(c => c.id === item?.channel_id);
+  const thumbPath = `output/${item?.channel_id}/${contentId}/thumbnail.png`;
+  document.getElementById('thumb-preview').innerHTML = '<span style="color:#8b949e;font-size:12px;">Click Generate to create thumbnail</span>';
+}
+
+function closePublishModal() {
+  document.getElementById('publish-modal').classList.remove('visible');
+  currentPublishContentId = null;
+}
+
+async function generateSEO() {
+  if (!currentPublishContentId) return;
+  const btn = document.getElementById('seo-btn');
+  btn.disabled = true;
+  btn.textContent = 'Generating...';
+
+  const result = await api(`/api/publish/${currentPublishContentId}/seo`, 'POST');
+
+  btn.disabled = false;
+  btn.textContent = 'Generate SEO';
+
+  if (result.title) document.getElementById('pub-title').value = result.title;
+  if (result.description) document.getElementById('pub-desc').value = result.description;
+  if (result.tags) document.getElementById('pub-tags').value = result.tags;
+}
+
+async function generateThumbnail() {
+  if (!currentPublishContentId) return;
+  const btn = document.getElementById('thumb-btn');
+  btn.disabled = true;
+  btn.textContent = 'Generating...';
+
+  const result = await api(`/api/publish/${currentPublishContentId}/thumbnail`, 'POST');
+
+  btn.disabled = false;
+  btn.textContent = 'Generate Thumbnail';
+
+  if (result.ok) {
+    document.getElementById('thumb-preview').innerHTML = '<span style="color:#3fb950;font-size:12px;">Thumbnail created</span>';
+  }
+}
+
+async function publishContent() {
+  if (!currentPublishContentId) return;
+  const btn = document.getElementById('publish-btn');
+  btn.disabled = true;
+  btn.textContent = 'Publishing...';
+
+  const platforms = [];
+  if (document.getElementById('pub-youtube').checked) platforms.push('youtube');
+  if (document.getElementById('pub-tiktok').checked) platforms.push('tiktok');
+  if (document.getElementById('pub-reels').checked) platforms.push('reels');
+
+  const result = await api(`/api/publish/${currentPublishContentId}`, 'POST', {
+    title: document.getElementById('pub-title').value,
+    description: document.getElementById('pub-desc').value,
+    tags: document.getElementById('pub-tags').value,
+    platforms,
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'Publish';
+
+  const status = document.getElementById('pub-status');
+  if (result.ok) {
+    status.textContent = result.message || 'Published!';
+    status.style.display = 'block';
+    loadChannels();
+    loadContent();
+  } else {
+    status.textContent = result.error || 'Publish failed';
+    status.style.color = '#f85149';
+    status.style.display = 'block';
+  }
+}
+
+function downloadFile(type) {
+  if (!currentPublishContentId) return;
+  window.open(`/api/publish/${currentPublishContentId}/download/${type}`);
 }
 
 // --- Settings ---
