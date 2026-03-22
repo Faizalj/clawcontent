@@ -135,18 +135,33 @@ function parseModalOutput(stdout: string): any {
 
 // ---- VOICE (3 providers) ----
 
+/**
+ * Strip markdown from script to get clean text for TTS.
+ * Removes: headers, timecodes, formatting, stage directions in parentheses.
+ */
+function stripScriptForTTS(markdown: string): string {
+  return markdown
+    .replace(/^#+\s*\[.*?\]\s*/gm, "")     // ## [0:00 - 0:25] HOOK → remove
+    .replace(/^#+\s+/gm, "")                // ## heading → remove ##
+    .replace(/\*\*/g, "")                    // **bold** → bold
+    .replace(/\*/g, "")                      // *italic* → italic
+    .replace(/\(.*?\)/g, "")                 // (stage directions) → remove
+    .replace(/\n{3,}/g, "\n\n")             // collapse multiple newlines
+    .trim();
+}
+
 async function stepVoice(contentId: number, ctx: PipelineContext): Promise<string> {
-  // Provider from workflow config > channel tts_provider > default
   const wfStep = ctx.workflowSteps.find((s) => s.name === "voice");
   const ttsProvider = wfStep?.provider || ctx.channel.tts_provider || "elevenlabs";
   const outPath = `${ctx.outputDir}/voice.mp3`;
+  const ttsText = stripScriptForTTS(ctx.scriptText);
 
   if (ttsProvider === "elevenlabs") {
-    await voiceElevenLabs(ctx.scriptText, outPath, ctx.env);
+    await voiceElevenLabs(ttsText, outPath, ctx.env);
   } else if (ttsProvider === "chatterbox") {
-    await voiceModal("chatterbox_tts.py", ctx.scriptText, outPath, ctx.channel.avatar_url);
+    await voiceModal("chatterbox_tts.py", ttsText, outPath, ctx.channel.avatar_url);
   } else if (ttsProvider === "f5tts-thai") {
-    await voiceModal("f5tts_thai.py", ctx.scriptText, outPath, ctx.channel.avatar_url);
+    await voiceModal("f5tts_thai.py", ttsText, outPath, ctx.channel.avatar_url);
   } else {
     throw new Error(`Unknown TTS provider: ${ttsProvider}`);
   }
