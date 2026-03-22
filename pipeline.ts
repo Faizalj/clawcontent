@@ -241,32 +241,31 @@ async function stepImages(contentId: number, ctx: PipelineContext): Promise<stri
 
   const imageStyle = ctx.profile?.image_style || "professional digital illustration, modern, clean, vibrant colors, 16:9";
 
-  const paths: string[] = [];
-
-  for (let i = 0; i < sections.length; i++) {
-    // Use <!-- image: ... --> from script if available, otherwise fallback
-    const embeddedPrompt = extractImagePrompt(sections[i].body);
-    const visualPrompt = embeddedPrompt
+  // Build all prompts + paths upfront
+  const batch = sections.map((section, i) => {
+    const embeddedPrompt = extractImagePrompt(section.body);
+    const prompt = embeddedPrompt
       ? `${imageStyle}. ${embeddedPrompt}`
-      : buildVisualPrompt(sections[i], ctx.channel.name, imageStyle);
-    const imgPath = `${ctx.outputDir}/img_${i}.jpeg`;
+      : buildVisualPrompt(section, ctx.channel.name, imageStyle);
+    return { prompt, path: `${ctx.outputDir}/img_${i}.jpeg` };
+  });
 
-    console.log(`🖼️  Generating image ${i + 1}/${sections.length} via Flux...`);
+  console.log(`🖼️  Generating ${batch.length} images in one batch via Z-Image-Turbo...`);
 
-    const stdout = await runModal("flux_image.py", {
-      prompt: `"${visualPrompt.replace(/"/g, '\\"')}"`,
-      "output-path": imgPath,
-    });
+  // Send all prompts in one Modal run — boot once, gen all
+  const batchJson = JSON.stringify(batch).replace(/'/g, "'\\''");
+  const stdout = await runModal("flux_image.py", {
+    "prompts-json": `'${batchJson}'`,
+  });
 
-    const result = parseModalOutput(stdout);
-    if (result.status !== "completed") {
-      throw new Error(`Flux image gen failed: ${JSON.stringify(result)}`);
-    }
+  const result = parseModalOutput(stdout);
+  const paths = batch.map(b => b.path).filter(p => existsSync(p));
 
-    paths.push(imgPath);
-    console.log(`✅ Image ${i + 1} saved: ${imgPath}`);
+  if (paths.length === 0) {
+    throw new Error(`Image gen failed: ${JSON.stringify(result)}`);
   }
 
+  console.log(`✅ ${paths.length}/${batch.length} images generated`);
   ctx.imagePaths = paths;
   return JSON.stringify(paths);
 }

@@ -1,10 +1,10 @@
 # Clawcontent — Z-Image-Turbo Image Generation (Modal)
-# Deploy: modal run modal/flux_image.py --prompt "A robot cooking" --output-path test.jpeg
+# Single image:  modal run modal/flux_image.py --prompt "A robot" --output-path test.jpeg
+# Batch images:  modal run modal/flux_image.py --prompts-json '[{"prompt":"A","path":"a.jpg"},{"prompt":"B","path":"b.jpg"}]'
 #
 # Uses Z-Image-Turbo (Alibaba Tongyi-MAI)
 # - Apache 2.0, ungated, no HuggingFace license needed
-# - 8 NFEs (9 steps), fast inference
-# - Requires ZImagePipeline from diffusers (installed from source)
+# - 9 steps, fast inference, boot once → gen all images
 # GPU: L40S (48GB)
 
 import modal
@@ -36,58 +36,81 @@ image = (
     volumes={"/models": volume},
 )
 def generate_image(prompt: str, output_format: str = "jpeg") -> bytes:
-    """Generate an image using Z-Image-Turbo."""
+    """Generate a single image using Z-Image-Turbo."""
     import torch
     from diffusers import ZImagePipeline
     from io import BytesIO
 
     fmt = output_format.lower().strip()
-    if fmt not in ("jpeg", "png"):
-        raise ValueError(f"Unsupported format '{output_format}'. Use 'jpeg' or 'png'.")
     if not prompt or not prompt.strip():
         raise ValueError("Prompt must be non-empty.")
 
-    try:
-        pipe = ZImagePipeline.from_pretrained(
-            "Tongyi-MAI/Z-Image-Turbo",
-            torch_dtype=torch.bfloat16,
-            cache_dir="/models",
-        )
-        pipe.to("cuda")
-    except Exception as exc:
-        raise RuntimeError(f"Failed to load Z-Image-Turbo: {exc}") from exc
+    pipe = ZImagePipeline.from_pretrained(
+        "Tongyi-MAI/Z-Image-Turbo",
+        torch_dtype=torch.bfloat16,
+        cache_dir="/models",
+    )
+    pipe.to("cuda")
 
-    try:
-        result = pipe(
-            prompt=prompt,
-            num_inference_steps=9,
-            guidance_scale=0.0,
-            width=1280,
-            height=720,
-        )
-        generated_image = result.images[0]
-    except Exception as exc:
-        raise RuntimeError(f"Image generation failed: {exc}") from exc
+    result = pipe(
+        prompt=prompt,
+        num_inference_steps=9,
+        guidance_scale=0.0,
+        width=1280,
+        height=720,
+    )
 
     buf = BytesIO()
     save_format = "JPEG" if fmt == "jpeg" else "PNG"
     save_kwargs = {"quality": 90} if fmt == "jpeg" else {}
-    generated_image.save(buf, format=save_format, **save_kwargs)
-
+    result.images[0].save(buf, format=save_format, **save_kwargs)
     return buf.getvalue()
 
 
 @app.local_entrypoint()
-def main(prompt: str = "A beautiful landscape", output_path: str = "output.jpeg"):
-    fmt = "png" if output_path.lower().endswith(".png") else "jpeg"
+def main(
+    prompt: str = "",
+    output_path: str = "output.jpeg",
+    prompts_json: str = "",
+):
+    """Generate images. Batch mode: boot once, gen all, save all."""
 
+    # Batch mode: multiple prompts in one session
+    if prompts_json:
+        items = json.loads(prompts_json)
+        print(f"Batch: {len(items)} images")
+
+        results = []
+        for i, item in enumerate(items):
+            p = item.get("prompt", "")
+            path = item.get("path", f"output_{i}.jpeg")
+            fmt = "png" if path.lower().endswith(".png") else "jpeg"
+
+            print(f"  [{i+1}/{len(items)}] Generating...")
+            try:
+                img_bytes = generate_image.remote(p, output_format=fmt)
+                with open(path, "wb") as f:
+                    f.write(img_bytes)
+                results.append({"path": path, "status": "ok"})
+                print(f"  ✅ {path}")
+            except Exception as e:
+                results.append({"path": path, "status": "error", "error": str(e)})
+                print(f"  ❌ {path}: {e}")
+
+        print(json.dumps({"status": "completed", "results": results}))
+        return
+
+    # Single mode
+    if not prompt:
+        print(json.dumps({"status": "error", "error": "No prompt provided"}))
+        return
+
+    fmt = "png" if output_path.lower().endswith(".png") else "jpeg"
     try:
         img_bytes = generate_image.remote(prompt, output_format=fmt)
-    except Exception as exc:
-        print(json.dumps({"status": "error", "error": str(exc)}))
+        with open(output_path, "wb") as f:
+            f.write(img_bytes)
+        print(json.dumps({"status": "completed", "output_path": output_path}))
+    except Exception as e:
+        print(json.dumps({"status": "error", "error": str(e)}))
         raise SystemExit(1)
-
-    with open(output_path, "wb") as f:
-        f.write(img_bytes)
-
-    print(json.dumps({"status": "completed", "output_path": output_path}))
