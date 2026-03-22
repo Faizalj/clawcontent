@@ -304,64 +304,91 @@ async function stepLipsync(contentId: number, ctx: PipelineContext): Promise<str
   return outPath;
 }
 
-// ---- CAPTIONS (local Whisper + fallback) ----
+// ---- CAPTIONS (Whisper → fix typos → Playwright burn) ----
+// Same process as PAI YouTubeVideo EP1-10
+
+const CAPTION_TOOLS = `${homedir()}/.claude/skills/YouTubeVideo/Tools`;
 
 async function stepCaptions(contentId: number, ctx: PipelineContext): Promise<string> {
-  // Runs AFTER assembly — Whisper from assembled video → SRT → burn onto video
-  const srtPath = `${ctx.outputDir}/captions.srt`;
+  // Runs AFTER assembly
   const assembledVideo = `${ctx.outputDir}/final.mp4`;
+  const whisperJson = `${ctx.outputDir}/whisper_raw.json`;
+  const fixedJson = `${ctx.outputDir}/captions_fixed.json`;
+  const scriptPath = `${ctx.outputDir}/script.md`;
   const captionedVideo = `${ctx.outputDir}/final_captioned.mp4`;
 
-  // Step 1: Whisper → SRT
+  // Save script text as .md for fix_caption_typos.py
+  writeFileSync(scriptPath, ctx.scriptText, "utf-8");
+
   const audioSource = existsSync(assembledVideo) ? assembledVideo : ctx.voicePath;
+  if (!audioSource) throw new Error("No audio source for captions");
 
-  if (audioSource) {
+  // Step 1: Whisper → JSON (timing accurate, text may have errors)
+  console.log(`🎤 Step 1: Whisper transcription...`);
+  try {
+    await $`whisper ${audioSource} --model turbo --output_format json --output_dir ${ctx.outputDir} --word_timestamps True`.quiet();
+
+    // Whisper outputs {basename}.json — rename to whisper_raw.json
+    const baseName = audioSource.split("/").pop()!.replace(/\.[^.]+$/, "");
+    const whisperOut = `${ctx.outputDir}/${baseName}.json`;
+    if (existsSync(whisperOut)) {
+      await $`cp ${whisperOut} ${whisperJson}`.quiet();
+      console.log(`✅ Whisper JSON: ${whisperJson}`);
+    }
+  } catch (err: any) {
+    console.warn(`⚠️  Whisper failed: ${err.message}`);
+  }
+
+  // Step 2: Fix typos — align Whisper text with script (correct Thai text)
+  if (existsSync(whisperJson) && existsSync(scriptPath)) {
+    console.log(`🔤 Step 2: Fixing caption typos (script alignment)...`);
     try {
-      console.log(`🎤 Whisper: ${audioSource.split("/").pop()}`);
-      await $`whisper ${audioSource} --model turbo --output_format json --output_dir ${ctx.outputDir} --word_timestamps True`.quiet();
+      await $`python3 ${CAPTION_TOOLS}/fix_caption_typos.py --whisper ${whisperJson} --script ${scriptPath} --output ${fixedJson}`.quiet();
+      console.log(`✅ Fixed captions: ${fixedJson}`);
+    } catch (err: any) {
+      console.warn(`⚠️  Fix typos failed: ${err.message} — using raw Whisper`);
+      if (!existsSync(fixedJson)) {
+        await $`cp ${whisperJson} ${fixedJson}`.quiet();
+      }
+    }
+  } else if (existsSync(whisperJson)) {
+    // No script to compare — use raw Whisper
+    await $`cp ${whisperJson} ${fixedJson}`.quiet();
+  }
 
-      const baseName = audioSource.split("/").pop()!.replace(/\.[^.]+$/, "");
-      const whisperOut = `${ctx.outputDir}/${baseName}.json`;
+  // Step 3: Burn captions via Playwright (HTML render — Thai font safe)
+  const transcriptForBurn = existsSync(fixedJson) ? fixedJson : whisperJson;
 
-      if (existsSync(whisperOut)) {
-        const whisperData = JSON.parse(readFileSync(whisperOut, "utf-8"));
-        writeFileSync(srtPath, whisperToSrt(whisperData), "utf-8");
-        console.log(`✅ SRT from Whisper: ${srtPath}`);
+  if (existsSync(assembledVideo) && existsSync(transcriptForBurn)) {
+    console.log(`🎨 Step 3: Burning captions via Playwright...`);
+    try {
+      await $`python3 ${CAPTION_TOOLS}/animated_caption.py --transcript ${transcriptForBurn} --video ${assembledVideo} --output ${captionedVideo}`;
+
+      if (existsSync(captionedVideo)) {
+        await $`mv ${captionedVideo} ${assembledVideo}`.quiet();
+        console.log(`✅ Captions burned with Playwright — Thai font perfect`);
       }
     } catch (err: any) {
-      console.warn(`⚠️  Whisper failed, using script-based SRT: ${err.message}`);
-    }
-  }
+      console.warn(`⚠️  Playwright burn failed: ${err.message}`);
 
-  // Fallback SRT from script text
-  if (!existsSync(srtPath)) {
-    writeFileSync(srtPath, buildSrt(splitIntoSentences(ctx.scriptText)), "utf-8");
-    console.log(`✅ SRT from script text: ${srtPath}`);
-  }
-
-  // Step 2: Add captions to video
-  if (existsSync(assembledVideo) && existsSync(srtPath)) {
-    // Try hard burn (requires libass in ffmpeg)
-    try {
-      console.log("🔤 Burning captions onto video (hard sub)...");
-      await $`ffmpeg -y -i ${assembledVideo} -vf subtitles=${srtPath} -c:a copy ${captionedVideo}`.quiet();
-      await $`mv ${captionedVideo} ${assembledVideo}`.quiet();
-      console.log(`✅ Hard captions burned into video`);
-    } catch {
-      // Fallback: embed soft subtitles (player can toggle on/off)
+      // Fallback: embed soft subtitles
       try {
-        console.log("🔤 Embedding soft subtitles (no libass)...");
+        const srtPath = `${ctx.outputDir}/captions.srt`;
+        if (existsSync(transcriptForBurn)) {
+          const data = JSON.parse(readFileSync(transcriptForBurn, "utf-8"));
+          writeFileSync(srtPath, whisperToSrt(data), "utf-8");
+        }
         await $`ffmpeg -y -i ${assembledVideo} -i ${srtPath} -c:v copy -c:a copy -c:s mov_text ${captionedVideo}`.quiet();
         await $`mv ${captionedVideo} ${assembledVideo}`.quiet();
-        console.log(`✅ Soft subtitles embedded — enable in player`);
-      } catch (err: any) {
-        console.warn(`⚠️  Captions embed failed: ${err.message} — SRT file still available`);
+        console.log(`✅ Fallback: soft subtitles embedded`);
+      } catch {
+        console.warn(`⚠️  All caption methods failed — video without captions`);
       }
     }
   }
 
-  ctx.captionsPath = srtPath;
-  return srtPath;
+  ctx.captionsPath = existsSync(fixedJson) ? fixedJson : whisperJson;
+  return ctx.captionsPath || "";
 }
 
 // ---- ASSEMBLY (local ffmpeg) ----
