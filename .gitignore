@@ -5,3 +5,5 @@ data.db-wal
 output/
 .DS_Store
 MEMORY/
+.env
+.modal.toml
