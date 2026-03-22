@@ -141,8 +141,8 @@ function parseModalOutput(stdout: string): any {
  */
 function stripScriptForTTS(markdown: string): string {
   return markdown
-    .replace(/^#+\s*\[.*?\]\s*/gm, "")     // ## [0:00 - 0:25] HOOK → remove
-    .replace(/^#+\s+/gm, "")                // ## heading → remove ##
+    .replace(/^#+\s*\[.*?\].*$/gm, "")      // ## [0:00 - 0:25] HOOK → remove entire line
+    .replace(/^#+\s+.*$/gm, "")             // ## any heading → remove entire line
     .replace(/\*\*/g, "")                    // **bold** → bold
     .replace(/\*/g, "")                      // *italic* → italic
     .replace(/\(.*?\)/g, "")                 // (stage directions) → remove
