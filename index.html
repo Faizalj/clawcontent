@@ -343,7 +343,11 @@
     <div class="pipeline-panel" id="pipeline-panel">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <h3 id="pipeline-title">Production Pipeline</h3>
-        <button class="btn" onclick="closePipeline()">Close</button>
+        <div style="display:flex;gap:6px;">
+          <button class="btn danger" onclick="resetProduction()" style="font-size:11px;padding:5px 10px;">Reset to Script</button>
+          <button class="btn primary" onclick="restartProduction()" style="font-size:11px;padding:5px 10px;">Restart All</button>
+          <button class="btn" onclick="closePipeline()">Close</button>
+        </div>
       </div>
       <div class="pipeline-steps" id="pipeline-steps"></div>
     </div>
@@ -862,7 +866,7 @@ async function refreshPipeline() {
           </div>
           ${job.output_path && job.status === 'done' ? `<div class="step-detail">${esc(job.output_path)}</div>` : ''}
         </div>
-        ${job.status === 'failed' ? `<button class="btn" style="font-size:11px;padding:4px 8px;" onclick="retryPipelineStep(${currentPipelineContentId}, '${job.step}')">Retry</button>` : ''}
+        ${job.status === 'failed' || job.status === 'done' ? `<button class="btn" style="font-size:11px;padding:4px 8px;" onclick="retryPipelineStep(${currentPipelineContentId}, '${job.step}')">${job.status === 'failed' ? 'Retry' : 'Redo'}</button>` : ''}
       </div>
     `;
   }).join('');
@@ -872,6 +876,22 @@ async function refreshPipeline() {
 
 async function retryPipelineStep(contentId, step) {
   await api(`/api/production/${contentId}/retry/${step}`, 'POST');
+  refreshPipeline();
+}
+
+async function resetProduction() {
+  if (!currentPipelineContentId) return;
+  if (!confirm('Reset กลับไป Script Approved? Pipeline jobs จะถูกลบ')) return;
+  await api(`/api/production/${currentPipelineContentId}/reset`, 'POST');
+  closePipeline();
+  loadChannels();
+  loadContent();
+}
+
+async function restartProduction() {
+  if (!currentPipelineContentId) return;
+  if (!confirm('Restart pipeline ใหม่ทั้งหมด?')) return;
+  await api(`/api/production/${currentPipelineContentId}/start`, 'POST');
   refreshPipeline();
 }
 

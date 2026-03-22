@@ -12,6 +12,7 @@ import {
   upsertChannel,
   deleteChannel,
   getPipelineJobs,
+  deletePipelineJobs,
   getAllSettings,
   setSetting,
   setScanStatus,
@@ -388,6 +389,15 @@ steps:
       });
 
       return Response.json({ ok: true, message: `Retrying ${step}` });
+    }
+
+    // POST /api/production/:id/reset — reset back to script_approved
+    const prodResetMatch = path.match(/^\/api\/production\/(\d+)\/reset$/);
+    if (prodResetMatch && req.method === "POST") {
+      const contentId = parseInt(prodResetMatch[1]);
+      deletePipelineJobs(contentId);
+      updateContentStatus(contentId, "script_approved");
+      return Response.json({ ok: true, message: "Reset to script_approved" });
     }
 
     // DELETE /api/channels/:id
