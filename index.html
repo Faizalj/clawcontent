@@ -838,22 +838,30 @@ async function refreshPipeline() {
     return;
   }
 
+  const STATUS_LABELS = {
+    pending: 'Pending', running: 'Running...', done: 'Done', failed: 'Failed', skipped: 'Skipped',
+  };
+
   container.innerHTML = jobs.map(job => {
-    const elapsed = job.started_at && job.completed_at
-      ? Math.round((new Date(job.completed_at) - new Date(job.started_at)) / 1000) + 's'
-      : job.started_at && job.status === 'running'
-      ? Math.round((Date.now() - new Date(job.started_at + 'Z').getTime()) / 1000) + 's...'
-      : '';
+    let elapsed = '';
+    if (job.started_at && job.completed_at) {
+      const ms = new Date(job.completed_at).getTime() - new Date(job.started_at).getTime();
+      elapsed = isNaN(ms) ? '' : Math.round(ms / 1000) + 's';
+    } else if (job.started_at && job.status === 'running') {
+      const ms = Date.now() - new Date(job.started_at).getTime();
+      elapsed = isNaN(ms) ? '' : Math.round(ms / 1000) + 's...';
+    }
 
     return `
       <div class="pipeline-step">
         <div class="step-icon ${job.status}">${STATUS_ICONS[job.status] || '?'}</div>
         <div class="step-info">
           <div class="step-name">${STEP_ICONS[job.step] || '📦'} ${STEP_LABELS[job.step] || job.step}</div>
-          ${job.output_path ? `<div class="step-detail">${esc(job.output_path)}</div>` : ''}
-          ${job.error ? `<div class="step-error">${esc(job.error)}</div>` : ''}
+          <div class="step-detail" style="color:${job.status === 'failed' ? '#f85149' : job.status === 'done' ? '#3fb950' : '#8b949e'}">
+            ${job.error ? esc(job.error) : STATUS_LABELS[job.status] || job.status}${elapsed ? ' — ' + elapsed : ''}
+          </div>
+          ${job.output_path && job.status === 'done' ? `<div class="step-detail">${esc(job.output_path)}</div>` : ''}
         </div>
-        <div class="step-time">${elapsed}</div>
         ${job.status === 'failed' ? `<button class="btn" style="font-size:11px;padding:4px 8px;" onclick="retryPipelineStep(${currentPipelineContentId}, '${job.step}')">Retry</button>` : ''}
       </div>
     `;
