@@ -1,12 +1,11 @@
-# Clawcontent — Z-Image-Turbo Image Generation (Modal + ComfyUI)
-# Deploy: modal deploy modal/flux_image.py
-# Test:   modal run modal/flux_image.py --prompt "A robot cooking" --output-path test.jpeg
+# Clawcontent — Z-Image-Turbo Image Generation (Modal)
+# Deploy: modal run modal/flux_image.py --prompt "A robot cooking" --output-path test.jpeg
 #
-# Uses Z-Image-Turbo-GGUF Q8 (Alibaba Tongyi-MAI)
+# Uses Z-Image-Turbo (Alibaba Tongyi-MAI)
 # - Apache 2.0, ungated, no HuggingFace license needed
-# - 8 steps, fast inference
-# - Q8 on T4 (16GB) = 99% quality
-# GPU: L40S (48GB VRAM — FP16 model needs ~16GB + overhead)
+# - 8 NFEs (9 steps), fast inference
+# - Requires ZImagePipeline from diffusers (installed from source)
+# GPU: L40S (48GB)
 
 import modal
 import os
@@ -18,15 +17,13 @@ volume = modal.Volume.from_name("zimage-models", create_if_missing=True)
 image = (
     modal.Image.debian_slim(python_version="3.12")
     .pip_install(
-        "diffusers",
+        "git+https://github.com/huggingface/diffusers",
         "transformers",
         "torch",
         "accelerate",
         "sentencepiece",
         "protobuf",
         "pillow",
-        "huggingface_hub",
-        "gguf",
     )
 )
 
@@ -38,10 +35,9 @@ image = (
     volumes={"/models": volume},
 )
 def generate_image(prompt: str, output_format: str = "jpeg") -> bytes:
-    """Generate an image using Z-Image-Turbo-GGUF Q8."""
+    """Generate an image using Z-Image-Turbo."""
     import torch
-    from diffusers import DiffusionPipeline
-    from huggingface_hub import hf_hub_download
+    from diffusers import ZImagePipeline
     from io import BytesIO
 
     fmt = output_format.lower().strip()
@@ -50,11 +46,8 @@ def generate_image(prompt: str, output_format: str = "jpeg") -> bytes:
     if not prompt or not prompt.strip():
         raise ValueError("Prompt must be non-empty.")
 
-    model_path = "/models/z-image-turbo"
-    os.makedirs(model_path, exist_ok=True)
-
     try:
-        pipe = DiffusionPipeline.from_pretrained(
+        pipe = ZImagePipeline.from_pretrained(
             "Tongyi-MAI/Z-Image-Turbo",
             torch_dtype=torch.bfloat16,
             cache_dir="/models",
@@ -65,9 +58,9 @@ def generate_image(prompt: str, output_format: str = "jpeg") -> bytes:
 
     try:
         result = pipe(
-            prompt,
-            num_inference_steps=8,
-            guidance_scale=3.5,
+            prompt=prompt,
+            num_inference_steps=9,
+            guidance_scale=0.0,
             width=1280,
             height=720,
         )
