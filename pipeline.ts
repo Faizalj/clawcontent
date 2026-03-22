@@ -409,13 +409,15 @@ async function stepAssembly(contentId: number, ctx: PipelineContext): Promise<st
 
     // Scale lipsync to 1280x720 if needed
     const scaledLip = `${ctx.outputDir}/lipsync_scaled.mp4`;
-    await $`ffmpeg -y -i ${ctx.lipsyncPath} -vf scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2 -c:a copy ${scaledLip}`.quiet();
+    const scaleFilter = "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:-1:-1";
+    const cp = require("child_process");
+    cp.execFileSync("ffmpeg", ["-y", "-i", ctx.lipsyncPath!, "-vf", scaleFilter, "-c:a", "copy", scaledLip], { stdio: "pipe" });
 
     // Create insert clips (5s each, scaled to 1280x720)
     const insertClips: string[] = [];
     for (let i = 0; i < ctx.imagePaths.length; i++) {
       const clipPath = `${ctx.outputDir}/insert_${i}.mp4`;
-      await $`ffmpeg -y -loop 1 -i ${ctx.imagePaths[i]} -c:v libx264 -t 5 -pix_fmt yuv420p -vf scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2 -r 25 ${clipPath}`.quiet();
+      cp.execFileSync("ffmpeg", ["-y", "-loop", "1", "-i", ctx.imagePaths[i], "-c:v", "libx264", "-t", "5", "-pix_fmt", "yuv420p", "-vf", scaleFilter, "-r", "25", clipPath], { stdio: "pipe" });
       insertClips.push(clipPath);
     }
 
@@ -455,8 +457,7 @@ async function stepAssembly(contentId: number, ctx: PipelineContext): Promise<st
     args.push("-filter_complex_script", filterFile);
     args.push("-map", "[vout]", "-map", "0:a", "-c:a", "copy", "-shortest", outPath);
 
-    const { execSync } = require("child_process");
-    execSync(`ffmpeg ${args.map(a => `"${a}"`).join(" ")}`, { stdio: "pipe" });
+    cp.execFileSync("ffmpeg", args, { stdio: "pipe" });
 
     console.log(`✅ ${insertClips.length} inserts overlaid on lipsync`);
 
