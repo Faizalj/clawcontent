@@ -362,7 +362,13 @@ async function stepCaptions(contentId: number, ctx: PipelineContext): Promise<st
   if (existsSync(assembledVideo) && existsSync(transcriptForBurn)) {
     console.log(`🎨 Step 3: Burning captions via Playwright...`);
     try {
-      await $`python3 ${CAPTION_TOOLS}/animated_caption.py --transcript ${transcriptForBurn} --video ${assembledVideo} --output ${captionedVideo}`;
+      const cp2 = require("child_process");
+      cp2.execFileSync("python3", [
+        `${CAPTION_TOOLS}/animated_caption.py`,
+        "--transcript", transcriptForBurn,
+        "--video", assembledVideo,
+        "--output", captionedVideo,
+      ], { stdio: "inherit", timeout: 600000 });
 
       if (existsSync(captionedVideo)) {
         await $`mv ${captionedVideo} ${assembledVideo}`.quiet();
