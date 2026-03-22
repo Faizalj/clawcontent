@@ -577,6 +577,8 @@ async function loadChannels() {
 
 async function selectChannel(id) {
   currentChannel = id;
+  closeScript();
+  closePipeline();
   document.getElementById('scan-btn').disabled = false;
   document.getElementById('manual-btn').style.display = 'inline-block';
 
@@ -596,6 +598,8 @@ function setTab(el) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
   currentStatus = el.dataset.status;
+  closeScript();
+  closePipeline();
   loadContent();
 }
 
