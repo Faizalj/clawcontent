@@ -54,10 +54,9 @@ def generate_image(prompt: str, output_format: str = "jpeg") -> bytes:
     os.makedirs(model_path, exist_ok=True)
 
     try:
-        # Try loading from cache first
         pipe = DiffusionPipeline.from_pretrained(
             "Tongyi-MAI/Z-Image-Turbo",
-            torch_dtype=torch.float16,
+            torch_dtype=torch.bfloat16,
             cache_dir="/models",
         )
         pipe.to("cuda")
@@ -68,7 +67,7 @@ def generate_image(prompt: str, output_format: str = "jpeg") -> bytes:
         result = pipe(
             prompt,
             num_inference_steps=8,
-            guidance_scale=0.0,
+            guidance_scale=3.5,
             width=1280,
             height=720,
         )
