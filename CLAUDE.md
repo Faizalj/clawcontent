@@ -24,11 +24,13 @@ db.ts              — SQLite
 index.html         — Dashboard UI
 ```
 
-## Rules
+## Rules for Contributors / PR Agents
 
-1. **Never modify `pipeline.ts`** to add step logic — create a file in `steps/` instead
-2. **Never modify `steps/index.ts`** — it auto-discovers steps
-3. **Never modify `steps/types.ts`** unless adding a new context field (discuss first)
+These rules apply when contributing steps or features via PR — not for project owner.
+
+1. **Don't modify `pipeline.ts`** to add step logic — create a file in `steps/` instead
+2. **Don't modify `steps/index.ts`** — it auto-discovers steps
+3. **Don't modify `steps/types.ts`** unless adding a new context field (discuss first)
 4. **Every step file** must export default `PipelineStep` with `requires` and `provides`
 5. **Use helpers** from `steps/helpers.ts` — don't duplicate loadEnv, runModal, etc.
 6. **Output files** go in `ctx.outputDir` — never hardcode paths
