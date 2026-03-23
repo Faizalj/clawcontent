@@ -28,10 +28,11 @@ const step: PipelineStep = {
         await $`ffprobe -v quiet -show_entries format=duration -of csv=p=0 ${ctx.lipsyncPath}`.text();
       const lipDur = parseFloat(lipDurStr.trim());
 
-      // Scale lipsync to 1280x720 if needed
+      // Scale lipsync to target resolution from workflow profile
       const scaledLip = `${ctx.outputDir}/lipsync_scaled.mp4`;
+      const [w, h] = (ctx.profile?.resolution || "1280x720").split("x");
       const scaleFilter =
-        "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:-1:-1";
+        `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:-1:-1`;
       const cp = require("child_process");
       cp.execFileSync(
         "ffmpeg",
@@ -48,7 +49,8 @@ const step: PipelineStep = {
         { stdio: "pipe" }
       );
 
-      // Create insert clips (5s each, scaled to 1280x720)
+      // Create insert clips, scaled to target resolution
+      const insertDur = ctx.profile?.insert_duration || 5;
       const insertClips: string[] = [];
       for (let i = 0; i < ctx.imagePaths.length; i++) {
         const clipPath = `${ctx.outputDir}/insert_${i}.mp4`;
@@ -77,9 +79,7 @@ const step: PipelineStep = {
         insertClips.push(clipPath);
       }
 
-      // Calculate overlay timestamps — distribute inserts evenly across video
-      // Leave first 10s and last 10s as pure lipsync
-      const insertDur = 5;
+      // Calculate overlay timestamps — distribute inserts evenly
       const usableDur = lipDur - 20;
       const interval = usableDur / (insertClips.length + 1);
 

@@ -19,21 +19,35 @@ export interface WorkflowProfile {
   source: "file" | "db";
   raw_yaml?: string;
 
-  // Production config
-  language: string;
-  video_duration: string;
-  script_format: string;
+  // Video format
+  orientation: string;        // landscape | portrait | square
+  resolution: string;         // 1280x720 | 1080x1920 | 1080x1080
+  video_duration: string;     // 1min | 3-4min | 5-7min | 10min+
 
-  // Provider config
-  tts_provider: string;
-  tts_voice_id: string;
-  image_style: string;
-  use_lipsync: boolean;
+  // Content
+  content_mode: string;       // standalone | series
+  language: string;           // th | en
+  script_format: string;      // 2-section | 4-section
+  script_instruction: string; // custom prompt for agent
 
-  // Resources
-  thumbnail_style: string;
-  image_negative: string;
-  script_instruction: string;
+  // Voice
+  tts_provider: string;       // elevenlabs | chatterbox | f5tts-thai
+  tts_voice_id: string;       // ElevenLabs voice clone ID
+
+  // Visual
+  image_style: string;        // AI image generation style prompt
+  image_negative: string;     // negative prompt for image gen
+  use_lipsync: boolean;       // enable lipsync (needs avatar)
+
+  // Insert
+  insert_interval: number;    // insert image every N seconds
+  insert_duration: number;    // each insert shows for N seconds
+
+  // Output
+  thumbnail_style: string;    // gradient | minimal
+
+  // Compute (reserved)
+  gpu_provider: string;       // modal | comfyui-local | comfyui-cloud
 }
 
 // ---------------------------------------------------------------------------
@@ -67,18 +81,35 @@ function parseWorkflow(id: string, raw: string, source: "file" | "db"): Workflow
       source,
       raw_yaml: raw,
 
-      language: p.language || "th",
+      // Video format
+      orientation: p.orientation || "landscape",
+      resolution: p.resolution || (p.orientation === "portrait" ? "1080x1920" : "1280x720"),
       video_duration: p.video_duration || "3-4min",
-      script_format: p.script_format || "4-section",
 
+      // Content
+      content_mode: p.content_mode || "standalone",
+      language: p.language || "th",
+      script_format: p.script_format || "4-section",
+      script_instruction: p.script_instruction || "",
+
+      // Voice
       tts_provider: p.tts_provider || "elevenlabs",
       tts_voice_id: p.tts_voice_id || "",
+
+      // Visual
       image_style: p.image_style || "professional illustration, modern, 16:9",
+      image_negative: p.image_negative || "",
       use_lipsync: p.use_lipsync !== false,
 
+      // Insert
+      insert_interval: p.insert_interval || 20,
+      insert_duration: p.insert_duration || 5,
+
+      // Output
       thumbnail_style: p.thumbnail_style || "gradient",
-      image_negative: p.image_negative || "",
-      script_instruction: p.script_instruction || "",
+
+      // Compute
+      gpu_provider: p.gpu_provider || "modal",
     };
   } catch {
     return null;

@@ -2,15 +2,32 @@
 name: Full Video Thai
 description: "วิดีโอเต็มรูปแบบ พร้อม voice clone, lipsync, captions"
 
-language: th
-video_duration: 3-4min
-script_format: 4-section
+# Video format
+orientation: landscape       # landscape | portrait | square
+resolution: 1280x720        # output resolution
+video_duration: 3-4min       # target duration
 
-tts_provider: elevenlabs
+# Content
+content_mode: standalone     # standalone | series
+language: th
+script_format: 4-section     # 2-section | 4-section
+script_instruction: ""       # custom prompt for agent
+
+# Voice
+tts_provider: elevenlabs     # elevenlabs | chatterbox | f5tts-thai
 tts_voice_id: camsOHfnF030L7enGMzZ
-image_style: "professional digital illustration, modern, clean, vibrant colors, 16:9"
+
+# Visual
+image_style: "professional digital illustration, modern, clean, vibrant colors"
+image_negative: "text, watermark, blurry, low quality"
 use_lipsync: true
 
-thumbnail_style: gradient
-image_negative: "text, watermark, blurry, low quality"
-script_instruction: ""
+# Insert (images overlay on lipsync)
+insert_interval: 20          # insert every N seconds
+insert_duration: 5           # each insert shows N seconds
+
+# Output
+thumbnail_style: gradient    # gradient | minimal
+
+# Compute
+gpu_provider: modal          # modal | comfyui-local | comfyui-cloud
