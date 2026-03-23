@@ -1572,24 +1572,32 @@ async function updateOnboarding() {
 
   const settings = await api('/api/settings');
   const channels = await api('/api/channels');
+  const agents = agentCache || [];
+
   const hasAgent = settings.find(s => s.key === 'DEFAULT_AGENT_ID' && s.source !== 'not-set');
   const hasModal = settings.find(s => s.key === 'MODAL_TOKEN_ID' && s.source !== 'not-set');
   const hasChannel = channels.length > 0;
+  const hasContent = channels.some(ch => ch.counts && Object.values(ch.counts).some(v => v > 0));
+  const hasOpenClaw = agents.length > 0;
 
   const steps = [
-    { done: hasAgent, label: 'Set Default AI Agent', action: 'openSettingsModal()', icon: '1' },
-    { done: hasModal, label: 'Add Modal Token (GPU)', action: 'openSettingsModal()', icon: '2' },
-    { done: hasChannel, label: 'Create a Channel', action: 'openChannelModal()', icon: '3' },
-    { done: false, label: 'Scan for Content Ideas', action: '', icon: '4' },
+    { done: hasOpenClaw, label: 'OpenClaw Gateway', desc: hasOpenClaw ? `${agents.length} agents connected` : 'Start: openclaw gateway start', action: '', icon: '1' },
+    { done: hasAgent, label: 'Default AI Agent', desc: hasAgent ? 'Agent set' : 'Select your agent for AI features', action: 'openSettingsModal()', icon: '2' },
+    { done: hasModal, label: 'Modal GPU Token', desc: hasModal ? 'Token set' : 'For image gen + lipsync', action: 'openSettingsModal()', icon: '3' },
+    { done: hasChannel, label: 'Create Channel', desc: hasChannel ? `${channels.length} channel(s)` : 'Your content brand', action: 'openChannelModal()', icon: '4' },
+    { done: hasContent, label: 'Scan for Ideas', desc: hasContent ? 'Content found!' : 'Select channel → Scan News', action: hasChannel && currentChannel ? `scanChannel()` : '', icon: '5' },
   ];
 
   el.innerHTML = steps.map(s => `
-    <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:#161b22;border:1px solid #30363d;border-radius:8px;${s.done ? 'opacity:0.5;' : ''}">
-      <div style="width:28px;height:28px;border-radius:50%;background:${s.done ? '#238636' : '#30363d'};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;">
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);${s.done ? 'opacity:0.5;' : ''}">
+      <div style="width:26px;height:26px;border-radius:50%;background:${s.done ? 'var(--green)' : 'var(--bg-tertiary)'};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;color:${s.done ? 'white' : 'var(--text-muted)'};">
         ${s.done ? '&#10003;' : s.icon}
       </div>
-      <span style="flex:1;font-size:13px;${s.done ? 'text-decoration:line-through;' : ''}">${s.label}</span>
-      ${!s.done && s.action ? `<button class="btn primary" onclick="${s.action}" style="font-size:11px;padding:4px 12px;">Setup</button>` : ''}
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:600;${s.done ? 'text-decoration:line-through;' : ''}">${s.label}</div>
+        <div style="font-size:11px;color:var(--text-muted);">${s.desc}</div>
+      </div>
+      ${!s.done && s.action ? `<button class="btn primary" onclick="${s.action}" style="font-size:10px;padding:4px 10px;">Setup</button>` : ''}
     </div>
   `).join('');
 }
