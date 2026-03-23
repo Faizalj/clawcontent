@@ -214,6 +214,8 @@ Bun.serve({
           avatar_url: body.avatar_url,
           tts_provider: body.tts_provider,
           workflow_id: body.workflow_id,
+          orientation: body.orientation,
+          video_duration: body.video_duration,
         });
         return Response.json({ ok: true });
       })();

@@ -27,6 +27,17 @@ export { loadEnv };
 // Pipeline orchestration
 // ---------------------------------------------------------------------------
 
+function resolveProfile(channel: any) {
+  const base = channel.workflow_id ? getWorkflow(channel.workflow_id) : null;
+  if (!base) return null;
+  return {
+    ...base,
+    orientation: channel.orientation || base.orientation,
+    resolution: channel.orientation === "portrait" ? "1080x1920" : channel.orientation === "square" ? "1080x1080" : base.resolution,
+    video_duration: channel.video_duration || base.video_duration,
+  };
+}
+
 function outputDirFor(channelId: string, contentId: number): string {
   const { mkdirSync } = require("fs");
   const dir = `${import.meta.dir}/output/${channelId}/${contentId}`;
@@ -42,7 +53,7 @@ export async function startPipeline(contentId: number): Promise<void> {
   if (!channel) throw new Error(`Channel not found: ${content.channel_id}`);
 
   // Resolve steps from workflow profile
-  const profile = channel.workflow_id ? getWorkflow(channel.workflow_id) : null;
+  const profile = resolveProfile(channel);
   const available = getAvailableSteps();
   const steps = profile
     ? resolveSteps(profile).filter((s) => available.includes(s))
@@ -76,7 +87,7 @@ export async function runPipeline(contentId: number): Promise<void> {
   const scriptText = script.approved_text || script.draft_text;
   if (!scriptText) throw new Error("No script text available");
 
-  const profile = channel.workflow_id ? getWorkflow(channel.workflow_id) : null;
+  const profile = resolveProfile(channel);
 
   const ctx: PipelineContext = {
     outputDir: outputDirFor(content.channel_id, contentId),

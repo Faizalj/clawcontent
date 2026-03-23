@@ -74,6 +74,8 @@ db.run(`
 try { db.run("ALTER TABLE channels ADD COLUMN avatar_url TEXT DEFAULT ''"); } catch {}
 try { db.run("ALTER TABLE channels ADD COLUMN tts_provider TEXT DEFAULT 'elevenlabs'"); } catch {}
 try { db.run("ALTER TABLE channels ADD COLUMN workflow_id TEXT DEFAULT 'full-video-thai'"); } catch {}
+try { db.run("ALTER TABLE channels ADD COLUMN orientation TEXT DEFAULT 'landscape'"); } catch {}
+try { db.run("ALTER TABLE channels ADD COLUMN video_duration TEXT DEFAULT '3-4min'"); } catch {}
 
 db.run(`
   CREATE TABLE IF NOT EXISTS settings (
@@ -108,10 +110,12 @@ export function upsertChannel(ch: {
   avatar_url?: string;
   tts_provider?: string;
   workflow_id?: string;
+  orientation?: string;
+  video_duration?: string;
 }) {
   db.run(
-    `INSERT OR REPLACE INTO channels (id, name, description, agent_id, research_type, pipeline_steps, accent_color, avatar_url, tts_provider, workflow_id, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+    `INSERT OR REPLACE INTO channels (id, name, description, agent_id, research_type, pipeline_steps, accent_color, avatar_url, tts_provider, workflow_id, orientation, video_duration, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
     [
       ch.id,
       ch.name,
@@ -123,6 +127,8 @@ export function upsertChannel(ch: {
       ch.avatar_url || "",
       ch.tts_provider || "elevenlabs",
       ch.workflow_id || "full-video-thai",
+      ch.orientation || "landscape",
+      ch.video_duration || "3-4min",
     ]
   );
 }

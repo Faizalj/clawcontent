@@ -430,6 +430,26 @@
 
     <div style="display:flex;gap:10px;">
       <div class="form-group" style="flex:1;">
+        <label>Orientation</label>
+        <select id="ch-orientation">
+          <option value="landscape">Landscape (16:9) — YouTube</option>
+          <option value="portrait">Portrait (9:16) — TikTok/Reels</option>
+          <option value="square">Square (1:1) — Instagram</option>
+        </select>
+      </div>
+      <div class="form-group" style="flex:1;">
+        <label>Duration</label>
+        <select id="ch-duration">
+          <option value="1-2min">1-2 min (shorts)</option>
+          <option value="3-4min" selected>3-4 min</option>
+          <option value="5-7min">5-7 min</option>
+          <option value="10min+">10 min+</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;">
+      <div class="form-group" style="flex:1;">
         <label>Content Discovery</label>
         <select id="ch-research">
           <option value="news">News — หาข่าวล่าสุด</option>
@@ -1509,6 +1529,8 @@ function openChannelModal(editId = null) {
         document.getElementById('ch-research').value = ch.research_type || 'news';
         document.getElementById('ch-avatar').value = ch.avatar_url || '';
         document.getElementById('ch-workflow').value = ch.workflow_id || 'full-video-thai';
+        document.getElementById('ch-orientation').value = ch.orientation || 'landscape';
+        document.getElementById('ch-duration').value = ch.video_duration || '3-4min';
         document.getElementById('ch-color').value = ch.accent_color || '#FF6600';
       }
     });
@@ -1525,6 +1547,8 @@ function openChannelModal(editId = null) {
     document.getElementById('ch-research').value = 'news';
     document.getElementById('ch-avatar').value = '';
     document.getElementById('ch-workflow').value = 'full-video-thai';
+    document.getElementById('ch-orientation').value = 'landscape';
+    document.getElementById('ch-duration').value = '3-4min';
     document.getElementById('ch-color').value = '#FF6600';
   }
 
@@ -1547,6 +1571,8 @@ async function saveChannel() {
     agent_id: document.getElementById('ch-agent').value || null,
     research_type: document.getElementById('ch-research').value,
     workflow_id: document.getElementById('ch-workflow').value || 'full-video-thai',
+    orientation: document.getElementById('ch-orientation').value || 'landscape',
+    video_duration: document.getElementById('ch-duration').value || '3-4min',
     avatar_url: document.getElementById('ch-avatar').value,
     accent_color: document.getElementById('ch-color').value,
   });
