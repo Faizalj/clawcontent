@@ -577,7 +577,7 @@
         <div class="form-group" style="flex:1;margin-bottom:0;">
           <label>Duration</label>
           <select id="wf-duration" style="width:100%;padding:6px 10px;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#e6edf3;font-size:13px;">
-            <option value="1min">1 min (shorts)</option>
+            <option value="1-2min">1-2 min (shorts/reels)</option>
             <option value="3-4min" selected>3-4 min</option>
             <option value="5-7min">5-7 min</option>
             <option value="10min+">10 min+</option>
@@ -1310,7 +1310,7 @@ function syncVisualToYaml() {
   if (desc) y += `description: "${desc}"\n`;
   y += `\nlanguage: ${lang}\n`;
   y += `video_duration: ${dur}\n`;
-  y += `script_format: ${dur === '1min' ? '2-section' : '4-section'}\n`;
+  y += `script_format: ${dur === '1-2min' ? '2-section' : '4-section'}\n`;
   y += `\ntts_provider: ${tts}\n`;
   y += `tts_voice_id: ""\n`;
   y += `image_style: "${imgStyle || 'professional illustration, modern, 16:9'}"\n`;

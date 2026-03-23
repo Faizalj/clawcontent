@@ -14,9 +14,12 @@ const step: PipelineStep = {
   requires: ["scriptText"],
   provides: ["imagePaths"],
   async execute(contentId: number, ctx: PipelineContext): Promise<string> {
+    // Determine aspect ratio from orientation
+    const orientation = ctx.profile?.orientation || "landscape";
+    const aspectRatio = orientation === "portrait" ? "9:16 vertical" : orientation === "square" ? "1:1 square" : "16:9";
     const imageStyle =
       ctx.profile?.image_style ||
-      "professional digital illustration, modern, clean, vibrant colors, 16:9";
+      `professional digital illustration, modern, clean, vibrant colors, ${aspectRatio}`;
 
     // Extract ALL <!-- image: --> prompts from script (not just per section)
     const embeddedPrompts = extractAllImagePrompts(ctx.scriptText);

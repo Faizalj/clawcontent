@@ -35,7 +35,7 @@ image = (
     timeout=600,
     volumes={"/models": volume},
 )
-def generate_image(prompt: str, output_format: str = "jpeg") -> bytes:
+def generate_image(prompt: str, output_format: str = "jpeg", width: int = 1280, height: int = 720) -> bytes:
     """Generate a single image using Z-Image-Turbo."""
     import torch
     from diffusers import ZImagePipeline
@@ -56,8 +56,8 @@ def generate_image(prompt: str, output_format: str = "jpeg") -> bytes:
         prompt=prompt,
         num_inference_steps=9,
         guidance_scale=0.0,
-        width=1280,
-        height=720,
+        width=width,
+        height=height,
     )
 
     buf = BytesIO()
