@@ -410,45 +410,54 @@
   <div class="modal">
     <h3 id="modal-title">Add Channel</h3>
     <input type="hidden" id="ch-edit-mode" value="add">
-    <div class="form-group">
-      <label>Channel ID (english, no spaces)</label>
-      <input id="ch-id" placeholder="e.g. ai-cooking">
-    </div>
-    <div class="form-group">
-      <label>Channel Name</label>
-      <input id="ch-name" placeholder="e.g. AI Cooking Thai">
-    </div>
-    <div class="form-group">
-      <label>Description / Concept</label>
-      <textarea id="ch-desc" placeholder="อธิบาย concept ช่อง target audience"></textarea>
-    </div>
-    <div class="form-group">
-      <label>OpenClaw Agent</label>
-      <select id="ch-agent">
-        <option value="">-- Loading agents... --</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Research Type</label>
-      <select id="ch-research">
-        <option value="news">News (หาข่าว)</option>
-        <option value="idea">Ideas (หาไอเดีย)</option>
-        <option value="trend">Trends (หาเทรนด์)</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Workflow</label>
-      <select id="ch-workflow">
-        <option value="">-- Loading workflows... --</option>
-      </select>
-      <div style="font-size:11px;color:#6e7681;margin-top:4px;">
-        กำหนด production pipeline — <a href="#" onclick="event.preventDefault();openWorkflowEditor()" style="color:#58a6ff;">สร้าง workflow ใหม่</a>
+
+    <div style="display:flex;gap:10px;">
+      <div class="form-group" style="flex:1;">
+        <label>Channel Name</label>
+        <input id="ch-name" placeholder="e.g. AI Cooking Thai" oninput="autoChannelId()">
+      </div>
+      <div class="form-group" style="width:160px;">
+        <label>ID (auto)</label>
+        <input id="ch-id" placeholder="auto" style="color:var(--text-muted);">
       </div>
     </div>
+
     <div class="form-group">
-      <label>Avatar URL (for lipsync)</label>
-      <input id="ch-avatar" placeholder="https://... real photo URL for lipsync">
+      <label>Description</label>
+      <textarea id="ch-desc" placeholder="อธิบาย concept ช่อง เช่น สอนเจ้าของธุรกิจใช้ AI, รีวิว gadget, สอนทำอาหาร" style="min-height:50px;"></textarea>
+      <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">AI จะใช้ข้อมูลนี้ในการหาข่าวและเขียน script</div>
     </div>
+
+    <div style="display:flex;gap:10px;">
+      <div class="form-group" style="flex:1;">
+        <label>Content Discovery</label>
+        <select id="ch-research">
+          <option value="news">News — หาข่าวล่าสุด</option>
+          <option value="idea">Ideas — หาไอเดีย content</option>
+          <option value="trend">Trends — หาเทรนด์</option>
+        </select>
+      </div>
+      <div class="form-group" style="flex:1;">
+        <label>Production Workflow</label>
+        <select id="ch-workflow">
+          <option value="">-- Loading... --</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Agent (optional — ใช้ Default Agent ถ้าไม่เลือก)</label>
+      <select id="ch-agent">
+        <option value="">-- Use Default Agent --</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Avatar (for lipsync)</label>
+      <input id="ch-avatar" placeholder="path หรือ URL ของรูปจริง เช่น channels/my-channel/avatar.png">
+      <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">ต้องเป็นรูปจริง ไม่ใช่ AI — ใส่ไว้ใน channels/{id}/avatar.png</div>
+    </div>
+
     <div class="form-group">
       <label>Accent Color</label>
       <input id="ch-color" type="color" value="#FF6600">
@@ -1469,6 +1478,14 @@ async function addManualContent() {
 }
 
 // --- Channel Management ---
+function autoChannelId() {
+  const name = document.getElementById('ch-name').value.trim();
+  const idInput = document.getElementById('ch-id');
+  if (!idInput.disabled && name) {
+    idInput.value = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30);
+  }
+}
+
 function openChannelModal(editId = null) {
   const modal = document.getElementById('channel-modal');
   const titleEl = document.getElementById('modal-title');
