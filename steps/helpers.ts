@@ -247,12 +247,13 @@ export async function runGpu(
   return runModal(script, args);
 }
 
+export const LOCAL_DIR = `${import.meta.dir}/../local`;
+
 async function runLocal(
   script: string,
   args: Record<string, string>
 ): Promise<string> {
-  // Run Python script directly — requires local GPU + dependencies
-  const scriptPath = `${MODAL_DIR}/${script}`;
+  const scriptPath = `${LOCAL_DIR}/${script}`;
   const argList = Object.entries(args).map(
     ([k, v]) => `--${k} ${v}`
   ).join(" ");
