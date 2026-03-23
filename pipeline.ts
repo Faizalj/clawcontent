@@ -45,7 +45,15 @@ function outputDirFor(channelId: string, contentId: number): string {
   return dir;
 }
 
+// Prevent concurrent pipeline runs on same content
+const runningPipelines = new Set<number>();
+
 export async function startPipeline(contentId: number): Promise<void> {
+  if (runningPipelines.has(contentId)) {
+    console.warn(`⚠️  Pipeline already running for content ${contentId} — skipping`);
+    return;
+  }
+
   const content = getContentById(contentId) as any;
   if (!content) throw new Error(`Content not found: ${contentId}`);
 
@@ -75,6 +83,13 @@ export async function startPipeline(contentId: number): Promise<void> {
 }
 
 export async function runPipeline(contentId: number): Promise<void> {
+  if (runningPipelines.has(contentId)) {
+    console.warn(`⚠️  Pipeline already running for content ${contentId}`);
+    return;
+  }
+  runningPipelines.add(contentId);
+
+  try {
   const content = getContentById(contentId) as any;
   if (!content) throw new Error(`Content not found: ${contentId}`);
 
@@ -166,6 +181,9 @@ export async function runPipeline(contentId: number): Promise<void> {
   if (getPipelineJobs(contentId).every((j: any) => j.status === "done")) {
     updateContentStatus(contentId, "produced");
     console.log(`🎉 Pipeline complete for content ${contentId}`);
+  }
+  } finally {
+    runningPipelines.delete(contentId);
   }
 }
 
