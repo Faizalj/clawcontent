@@ -98,8 +98,14 @@ ${channel.description}
  */
 export function buildScriptPrompt(
   channel: { name: string; description: string },
-  content: { title: string; summary: string; source_url: string }
+  content: { title: string; summary: string; source_url: string },
+  options?: { video_duration?: string; script_format?: string; script_instruction?: string }
 ): string {
+  const duration = options?.video_duration || "3-4min";
+  const format = options?.script_format || "4-section";
+  const sections = format === "2-section" ? 2 : 4;
+  const instruction = options?.script_instruction || "";
+
   return `เขียน script video สำหรับช่อง "${channel.name}"
 
 หัวข้อ: ${content.title}
@@ -108,14 +114,15 @@ export function buildScriptPrompt(
 
 Format ช่อง: ${channel.description}
 
-โครงสร้าง script (4 sections):
-## [0:00 - 0:25] HOOK
+โครงสร้าง script (${sections} sections):
+${sections >= 4 ? `## [0:00 - 0:25] HOOK
 ## [0:25 - 1:15] อธิบาย
 ## [1:15 - 2:30] เกี่ยวกับคุณยังไง
-## [2:30 - 3:30] สรุป + CTA
+## [2:30 - 3:30] สรุป + CTA` : `## [0:00 - 0:30] HOOK + เนื้อหา
+## [0:30 - 1:00] สรุป + CTA`}
 
-กฎสำคัญ:
-1. เขียนเป็นภาษาไทย พูดง่าย ไม่ technical มาก ความยาวรวม ~3-4 นาที
+${instruction ? `คำแนะนำเพิ่มเติม: ${instruction}\n` : ''}กฎสำคัญ:
+1. เขียนเป็นภาษาไทย พูดง่าย ไม่ technical มาก ความยาวรวม ~${duration}
 2. ใส่ <!-- image: ... --> ทุกๆ 2-3 ประโยค (ประมาณ 10-15 จุดทั้ง script)
    แต่ละ image prompt เป็นภาษาอังกฤษ อธิบายภาพที่เหมาะกับเนื้อหาตรงนั้น
    เช่น <!-- image: A businessman looking at AI dashboard on laptop, modern office, warm lighting, 16:9 -->

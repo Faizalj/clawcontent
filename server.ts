@@ -154,7 +154,13 @@ Bun.serve({
 
       const agentId = resolveAgentId(channel.agent_id);
       if (!agentId) return Response.json({ error: "No AI agent configured. Set Default Agent in Settings or assign agent to channel." }, { status: 400 });
-      const prompt = buildScriptPrompt(channel, content);
+      // Pass workflow profile options to script prompt
+      const wf = channel.workflow_id ? getWorkflow(channel.workflow_id) : null;
+      const prompt = buildScriptPrompt(channel, content, {
+        video_duration: wf?.video_duration,
+        script_format: wf?.script_format,
+        script_instruction: wf?.script_instruction,
+      });
 
       setTaskStatus(`script:${contentId}`, "generating", `Generating via agent ${agentId}...`);
 
