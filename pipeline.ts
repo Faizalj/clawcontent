@@ -106,6 +106,16 @@ export async function runPipeline(contentId: number): Promise<void> {
   for (const job of jobs) {
     if (job.status === "done") continue;
 
+    // Auto-recover stale "running" jobs (>30 min without update)
+    if (job.status === "running" && job.started_at) {
+      const started = new Date(job.started_at.includes("T") ? job.started_at : job.started_at + "Z").getTime();
+      const staleMs = 30 * 60 * 1000;
+      if (Date.now() - started > staleMs) {
+        console.warn(`⚠️  Step ${job.step} stale (>30min) — resetting to pending`);
+        updatePipelineJob(job.id, { status: "pending", error: null });
+      }
+    }
+
     const step = getStep(job.step);
     if (!step) {
       console.warn(`⚠️  Unknown step: ${job.step}`);

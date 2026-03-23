@@ -84,30 +84,34 @@ const step: PipelineStep = {
     if (existsSync(assembledVideo) && existsSync(transcriptForBurn)) {
       console.log(`🎨 Step 3: Burning captions via Playwright...`);
       try {
+        // Use async spawn — spawnSync buffer too small for long videos
         const cp2 = require("child_process");
-        const burnResult = cp2.spawnSync(
-          "python3",
-          [
+        await new Promise<void>((resolve, reject) => {
+          const proc = cp2.spawn("python3", [
             `${TOOLS_DIR}/animated_caption.py`,
-            "--transcript",
-            transcriptForBurn,
-            "--video",
-            assembledVideo,
-            "--output",
-            captionedVideo,
-          ],
-          { timeout: 600000, maxBuffer: 50 * 1024 * 1024 }
-        );
+            "--transcript", transcriptForBurn,
+            "--video", assembledVideo,
+            "--output", captionedVideo,
+          ]);
 
-        if (burnResult.stdout)
-          console.log(burnResult.stdout.toString().slice(-500));
-        if (burnResult.status !== 0) {
-          const errMsg =
-            burnResult.stderr?.toString()?.slice(-300) || "Unknown error";
-          throw new Error(
-            `Playwright burn exit ${burnResult.status}: ${errMsg}`
-          );
-        }
+          proc.stdout?.on("data", (d: Buffer) => {
+            const line = d.toString().trim();
+            if (line) console.log(`  ${line.slice(-200)}`);
+          });
+          proc.stderr?.on("data", (d: Buffer) => {
+            const line = d.toString().trim();
+            if (line && !line.includes("UserWarning")) console.warn(`  ${line.slice(-200)}`);
+          });
+
+          proc.on("close", (code: number) => {
+            if (code === 0) resolve();
+            else reject(new Error(`Playwright burn exit code ${code}`));
+          });
+          proc.on("error", reject);
+
+          // 15 min timeout for long videos
+          setTimeout(() => { proc.kill(); reject(new Error("Playwright burn timeout (15min)")); }, 900000);
+        });
 
         if (existsSync(captionedVideo)) {
           await $`mv ${captionedVideo} ${assembledVideo}`.quiet();

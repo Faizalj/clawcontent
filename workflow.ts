@@ -193,7 +193,7 @@ export function resolveSteps(profile: WorkflowProfile): string[] {
     steps.push("lipsync");
   }
 
-  steps.push("images", "assembly", "captions");
+  steps.push("images", "assembly", "captions", "thumbnail");
 
   return steps;
 }
