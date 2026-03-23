@@ -14,13 +14,14 @@ import {
 async function voiceElevenLabs(
   text: string,
   outPath: string,
-  env: Record<string, string>
+  ctx: PipelineContext
 ) {
-  const apiKey = env.ELEVENLABS_API_KEY;
+  const apiKey = ctx.env.ELEVENLABS_API_KEY;
   if (!apiKey) throw new Error("ELEVENLABS_API_KEY not set — add in Settings");
 
+  const voiceId = ctx.profile?.tts_voice_id || ctx.env.ELEVENLABS_VOICE_ID || "";
   const res = await fetch(
-    `https://api.elevenlabs.io/v1/text-to-speech/${ctx.profile?.tts_voice_id || ctx.env.ELEVENLABS_VOICE_ID || ""}`,
+    `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
     {
       method: "POST",
       headers: {
@@ -81,7 +82,7 @@ const step: PipelineStep = {
     const ttsText = stripScriptForTTS(ctx.scriptText);
 
     if (ttsProvider === "elevenlabs") {
-      await voiceElevenLabs(ttsText, outPath, ctx.env);
+      await voiceElevenLabs(ttsText, outPath, ctx);
     } else if (ttsProvider === "chatterbox") {
       await voiceModal(
         "chatterbox_tts.py",

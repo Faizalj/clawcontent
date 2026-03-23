@@ -76,6 +76,8 @@ try { db.run("ALTER TABLE channels ADD COLUMN tts_provider TEXT DEFAULT 'elevenl
 try { db.run("ALTER TABLE channels ADD COLUMN workflow_id TEXT DEFAULT 'full-video-thai'"); } catch {}
 try { db.run("ALTER TABLE channels ADD COLUMN orientation TEXT DEFAULT 'landscape'"); } catch {}
 try { db.run("ALTER TABLE channels ADD COLUMN video_duration TEXT DEFAULT '3-4min'"); } catch {}
+try { db.run("ALTER TABLE channels ADD COLUMN auto_approve INTEGER DEFAULT 0"); } catch {}
+try { db.run("ALTER TABLE pipeline_jobs ADD COLUMN retry_count INTEGER DEFAULT 0"); } catch {}
 
 db.run(`
   CREATE TABLE IF NOT EXISTS settings (
@@ -112,10 +114,11 @@ export function upsertChannel(ch: {
   workflow_id?: string;
   orientation?: string;
   video_duration?: string;
+  auto_approve?: boolean;
 }) {
   db.run(
-    `INSERT OR REPLACE INTO channels (id, name, description, agent_id, research_type, pipeline_steps, accent_color, avatar_url, tts_provider, workflow_id, orientation, video_duration, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+    `INSERT OR REPLACE INTO channels (id, name, description, agent_id, research_type, pipeline_steps, accent_color, avatar_url, tts_provider, workflow_id, orientation, video_duration, auto_approve, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
     [
       ch.id,
       ch.name,
@@ -129,6 +132,7 @@ export function upsertChannel(ch: {
       ch.workflow_id || "full-video-thai",
       ch.orientation || "landscape",
       ch.video_duration || "3-4min",
+      ch.auto_approve ? 1 : 0,
     ]
   );
 }
@@ -355,6 +359,63 @@ export function setSetting(key: string, value: string) {
 
 export function deleteSetting(key: string) {
   db.run("DELETE FROM settings WHERE key = ?", [key]);
+}
+
+// --- Dedup ---
+
+export function contentExists(channelId: string, title: string, sourceUrl?: string): boolean {
+  // Check by source URL first (exact match)
+  if (sourceUrl) {
+    const byUrl = db.query(
+      "SELECT id FROM content WHERE channel_id = ? AND source_url = ? LIMIT 1"
+    ).get(channelId, sourceUrl) as any;
+    if (byUrl) return true;
+  }
+  // Check by title similarity (exact match, case insensitive)
+  const byTitle = db.query(
+    "SELECT id FROM content WHERE channel_id = ? AND LOWER(title) = LOWER(?) LIMIT 1"
+  ).get(channelId, title) as any;
+  return !!byTitle;
+}
+
+// --- Auto-retry / Watchdog Queries ---
+
+export function getFailedPipelineJobs(contentId?: number) {
+  if (contentId) {
+    return db.query(
+      "SELECT * FROM pipeline_jobs WHERE content_id = ? AND status = 'failed' ORDER BY step_order ASC"
+    ).all(contentId) as any[];
+  }
+  return db.query(
+    "SELECT * FROM pipeline_jobs WHERE status = 'failed' ORDER BY content_id, step_order ASC"
+  ).all() as any[];
+}
+
+export function incrementRetryCount(jobId: number) {
+  db.run("UPDATE pipeline_jobs SET retry_count = COALESCE(retry_count, 0) + 1 WHERE id = ?", [jobId]);
+}
+
+export function getSystemHealth() {
+  const channels = db.query("SELECT COUNT(*) as count FROM channels").get() as any;
+  const content = db.query(
+    "SELECT status, COUNT(*) as count FROM content GROUP BY status"
+  ).all() as any[];
+  const pipelines = db.query(
+    "SELECT status, COUNT(*) as count FROM pipeline_jobs GROUP BY status"
+  ).all() as any[];
+  const stuckJobs = db.query(
+    `SELECT pj.*, c.title as content_title FROM pipeline_jobs pj
+     JOIN content c ON c.id = pj.content_id
+     WHERE pj.status = 'running'
+     AND pj.started_at < datetime('now', '-30 minutes')`
+  ).all() as any[];
+
+  return {
+    channels: channels.count,
+    content: Object.fromEntries(content.map((r: any) => [r.status, r.count])),
+    pipelines: Object.fromEntries(pipelines.map((r: any) => [r.status, r.count])),
+    stuck: stuckJobs,
+  };
 }
 
 // Seed Builder with AI channel if not exists

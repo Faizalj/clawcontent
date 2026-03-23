@@ -430,26 +430,6 @@
 
     <div style="display:flex;gap:10px;">
       <div class="form-group" style="flex:1;">
-        <label>Orientation</label>
-        <select id="ch-orientation">
-          <option value="landscape">Landscape (16:9) — YouTube</option>
-          <option value="portrait">Portrait (9:16) — TikTok/Reels</option>
-          <option value="square">Square (1:1) — Instagram</option>
-        </select>
-      </div>
-      <div class="form-group" style="flex:1;">
-        <label>Duration</label>
-        <select id="ch-duration">
-          <option value="1-2min">1-2 min (shorts)</option>
-          <option value="3-4min" selected>3-4 min</option>
-          <option value="5-7min">5-7 min</option>
-          <option value="10min+">10 min+</option>
-        </select>
-      </div>
-    </div>
-
-    <div style="display:flex;gap:10px;">
-      <div class="form-group" style="flex:1;">
         <label>Content Discovery</label>
         <select id="ch-research">
           <option value="news">News — หาข่าวล่าสุด</option>
@@ -478,9 +458,18 @@
       <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">ต้องเป็นรูปจริง ไม่ใช่ AI — ใส่ไว้ใน channels/{id}/avatar.png</div>
     </div>
 
-    <div class="form-group">
-      <label>Accent Color</label>
-      <input id="ch-color" type="color" value="#FF6600">
+    <div style="display:flex;gap:10px;align-items:center;">
+      <div class="form-group" style="flex:1;">
+        <label>Accent Color</label>
+        <input id="ch-color" type="color" value="#FF6600">
+      </div>
+      <div class="form-group" style="flex:1;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input id="ch-auto-approve" type="checkbox" style="width:16px;height:16px;">
+          Auto-approve
+        </label>
+        <div style="font-size:10px;color:var(--text-muted);">Scan แล้ว approve + script + produce อัตโนมัติ</div>
+      </div>
     </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeChannelModal()">Cancel</button>
@@ -501,6 +490,19 @@
     <div class="modal-actions">
       <button class="btn" onclick="closeSettingsModal()">Close</button>
       <button class="btn success" onclick="saveSettings()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Workflow Picker Modal -->
+<div class="modal-overlay" id="workflow-picker-modal">
+  <div class="modal" style="width:460px;">
+    <h3>เลือก Workflow</h3>
+    <p style="color:#8b949e;font-size:13px;margin-bottom:16px;">เลือกรูปแบบการผลิตสำหรับ content นี้</p>
+    <input type="hidden" id="wp-content-id">
+    <div id="wp-list" style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;"></div>
+    <div class="modal-actions" style="margin-top:16px;">
+      <button class="btn" onclick="closeWorkflowPicker()">Cancel</button>
     </div>
   </div>
 </div>
@@ -682,7 +684,9 @@ async function api(path, method = 'GET', body = null) {
     opts.body = JSON.stringify(body);
   }
   const res = await fetch(path, opts);
-  return res.json();
+  const text = await res.text();
+  try { return JSON.parse(text); }
+  catch { return { error: text || `HTTP ${res.status}` }; }
 }
 
 function esc(str) {
@@ -785,10 +789,11 @@ async function loadContent() {
           <button class="btn danger" onclick="regenerateScript(${item.id})" style="font-size:11px;padding:6px 10px;">Redo</button>
         ` : ''}
         ${item.status === 'script_approved' ? `
-          <button class="btn primary" onclick="startProduction(${item.id})">Start Production</button>
+          <button class="btn primary" onclick="showWorkflowPicker(${item.id})">Start Production</button>
         ` : ''}
         ${item.status === 'producing' ? `
           <button class="btn" onclick="viewPipeline(${item.id})">View Pipeline</button>
+          <button class="btn danger" onclick="cancelContent(${item.id})" style="font-size:11px;padding:6px 10px;">Cancel</button>
         ` : ''}
         ${item.status === 'produced' ? `
           <button class="btn" onclick="viewPipeline(${item.id})">Pipeline</button>
@@ -796,6 +801,9 @@ async function loadContent() {
         ` : ''}
         ${item.status === 'published' ? `
           <span class="badge" style="background:#23863633;color:#3fb950;">Published</span>
+        ` : ''}
+        ${!['discovered','rejected'].includes(item.status) ? `
+          <button class="btn" onclick="deleteContent(${item.id})" style="font-size:11px;padding:6px 8px;color:var(--text-muted);" title="Delete">×</button>
         ` : ''}
       </div>
     </div>
@@ -867,6 +875,20 @@ async function approveContent(id) {
 
 async function rejectContent(id) {
   await api(`/api/content/${id}/reject`, 'POST');
+  loadChannels();
+  loadContent();
+}
+
+async function cancelContent(id) {
+  if (!confirm('ยกเลิก production? จะกลับไปเป็น discovered')) return;
+  await api(`/api/content/${id}/cancel`, 'POST');
+  loadChannels();
+  loadContent();
+}
+
+async function deleteContent(id) {
+  if (!confirm('ลบ content นี้ถาวร?')) return;
+  await api(`/api/content/${id}`, 'DELETE');
   loadChannels();
   loadContent();
 }
@@ -961,8 +983,39 @@ function closeScript() {
   currentScriptContentId = null;
 }
 
+async function showWorkflowPicker(contentId) {
+  document.getElementById('wp-content-id').value = contentId;
+  const workflows = await api('/api/workflows');
+  const list = document.getElementById('wp-list');
+
+  list.innerHTML = workflows.map(w => {
+    const orient = w.orientation === 'portrait' ? '9:16' : w.orientation === 'square' ? '1:1' : '16:9';
+    const info = `${orient} · ${w.video_duration || '3-4min'} · ${w.steps?.length || '?'} steps`;
+    return `<div style="padding:12px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;" onclick="startProductionWithWorkflow(${contentId},'${w.id}')" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+      <div>
+        <div style="font-weight:600;font-size:14px;">${esc(w.name)}</div>
+        <div style="font-size:11px;color:var(--text-muted);">${info}</div>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);">${w.source}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('workflow-picker-modal').classList.add('visible');
+}
+
+function closeWorkflowPicker() {
+  document.getElementById('workflow-picker-modal').classList.remove('visible');
+}
+
+async function startProductionWithWorkflow(contentId, workflowId) {
+  closeWorkflowPicker();
+  await api(`/api/production/${contentId}/start`, 'POST', { workflow_id: workflowId });
+  loadChannels();
+  loadContent();
+  viewPipeline(contentId);
+}
+
 async function startProduction(id) {
-  if (!confirm('Start production pipeline? This will generate voice, images, lipsync, etc.')) return;
   await api(`/api/production/${id}/start`, 'POST');
   loadChannels();
   loadContent();
@@ -1564,9 +1617,8 @@ function openChannelModal(editId = null) {
         document.getElementById('ch-research').value = ch.research_type || 'news';
         document.getElementById('ch-avatar').value = ch.avatar_url || '';
         document.getElementById('ch-workflow').value = ch.workflow_id || 'full-video-thai';
-        document.getElementById('ch-orientation').value = ch.orientation || 'landscape';
-        document.getElementById('ch-duration').value = ch.video_duration || '3-4min';
         document.getElementById('ch-color').value = ch.accent_color || '#FF6600';
+        document.getElementById('ch-auto-approve').checked = !!ch.auto_approve;
       }
     });
   } else {
@@ -1582,9 +1634,8 @@ function openChannelModal(editId = null) {
     document.getElementById('ch-research').value = 'news';
     document.getElementById('ch-avatar').value = '';
     document.getElementById('ch-workflow').value = 'full-video-thai';
-    document.getElementById('ch-orientation').value = 'landscape';
-    document.getElementById('ch-duration').value = '3-4min';
     document.getElementById('ch-color').value = '#FF6600';
+    document.getElementById('ch-auto-approve').checked = false;
   }
 
   modal.classList.add('visible');
@@ -1606,10 +1657,9 @@ async function saveChannel() {
     agent_id: document.getElementById('ch-agent').value || null,
     research_type: document.getElementById('ch-research').value,
     workflow_id: document.getElementById('ch-workflow').value || 'full-video-thai',
-    orientation: document.getElementById('ch-orientation').value || 'landscape',
-    video_duration: document.getElementById('ch-duration').value || '3-4min',
     avatar_url: document.getElementById('ch-avatar').value,
     accent_color: document.getElementById('ch-color').value,
+    auto_approve: document.getElementById('ch-auto-approve').checked,
   });
 
   closeChannelModal();

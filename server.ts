@@ -20,16 +20,65 @@ import {
   getScanStatus,
   setTaskStatus,
   getTaskStatus,
+  getFailedPipelineJobs,
+  incrementRetryCount,
+  getSystemHealth,
+  contentExists,
 } from "./db";
 import { sendToAgent, parseAgentJson, getAgentList } from "./agent";
 import { buildResearchPrompt, buildScriptPrompt } from "./research";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { startPipeline, retryStep, loadEnv } from "./pipeline";
 import { getWorkflows, getWorkflow, saveWorkflow, deleteWorkflow, resolveSteps } from "./workflow";
-import { getSetting } from "./db";
+import { getSetting, db } from "./db";
 
 function resolveAgentId(channelAgentId?: string): string | null {
   return channelAgentId || getSetting("DEFAULT_AGENT_ID") || null;
+}
+
+// Shared: generate script via agent, save, and approve
+async function generateScriptForContent(contentId: number, channel: any, content: any, agentId: string): Promise<boolean> {
+  const wf = channel.workflow_id ? getWorkflow(channel.workflow_id) : null;
+  const prompt = buildScriptPrompt(channel, content, {
+    video_duration: wf?.video_duration,
+    script_format: wf?.script_format,
+    script_instruction: wf?.script_instruction,
+  });
+  const response = await sendToAgent(agentId, prompt, 180);
+  if (response.success) {
+    addScript(contentId, response.message, agentId);
+    return true;
+  }
+  console.error(`❌ Script gen failed for ${contentId}:`, response.message);
+  return false;
+}
+
+// Shared: auto-approve all discovered content for a channel
+async function autoApproveChannel(channelId: string): Promise<void> {
+  const channel = getChannel(channelId) as any;
+  if (!channel) return;
+
+  const discovered = getContent(channelId, "discovered") as any[];
+  if (discovered.length === 0) return;
+
+  const agentId = resolveAgentId(channel.agent_id);
+
+  for (const item of discovered) {
+    updateContentStatus(item.id, "approved");
+    console.log(`✅ Auto-approved: [${item.id}] ${item.title}`);
+
+    if (agentId) {
+      console.log(`✍️ Auto-generating script for: ${item.title}...`);
+      const ok = await generateScriptForContent(item.id, channel, item, agentId);
+      if (ok) {
+        approveScript(item.id);
+        console.log(`🚀 Auto-starting production for: ${item.title}`);
+        startPipeline(item.id).catch((err) => {
+          console.error(`❌ Auto-produce failed for ${item.id}:`, err);
+        });
+      }
+    }
+  }
 }
 import index from "./index.html";
 
@@ -110,8 +159,13 @@ Bun.serve({
           const items = parseAgentJson(response.message);
           console.log(`📋 Parsed ${items.length} items from response`);
           let added = 0;
+          let skipped = 0;
           for (const item of items) {
             if (item.title) {
+              if (contentExists(channelId, item.title, item.source_url)) {
+                skipped++;
+                continue;
+              }
               addContent({
                 channel_id: channelId,
                 type: channel.research_type || "news",
@@ -123,8 +177,17 @@ Bun.serve({
               added++;
             }
           }
-          console.log(`✅ Added ${added} items for ${channel.name}`);
-          setScanStatus(channelId, "done", `Found ${added} items`);
+          if (skipped > 0) console.log(`⏭️  Skipped ${skipped} duplicate items`);
+          console.log(`✅ Added ${added} items for ${channel.name}${skipped ? ` (${skipped} duplicates skipped)` : ""}`);
+          setScanStatus(channelId, "done", `Found ${added} new items${skipped ? `, ${skipped} duplicates skipped` : ""}`);
+
+          // Auto-approve if channel setting is on
+          if (channel.auto_approve && added > 0) {
+            console.log(`🤖 Auto-approve enabled for ${channel.name} — triggering auto-approve`);
+            autoApproveChannel(channelId).catch((err) => {
+              console.error(`❌ Auto-approve failed:`, err.message);
+            });
+          }
         } else {
           console.error(`❌ Agent failed:`, response.message);
           setScanStatus(channelId, "error", response.message);
@@ -154,28 +217,18 @@ Bun.serve({
 
       const agentId = resolveAgentId(channel.agent_id);
       if (!agentId) return Response.json({ error: "No AI agent configured. Set Default Agent in Settings or assign agent to channel." }, { status: 400 });
-      // Pass workflow profile options to script prompt
-      const wf = channel.workflow_id ? getWorkflow(channel.workflow_id) : null;
-      const prompt = buildScriptPrompt(channel, content, {
-        video_duration: wf?.video_duration,
-        script_format: wf?.script_format,
-        script_instruction: wf?.script_instruction,
-      });
 
       setTaskStatus(`script:${contentId}`, "generating", `Generating via agent ${agentId}...`);
 
       // Run in background
       (async () => {
         console.log(`✍️ Generating script for: ${content.title}...`);
-        const response = await sendToAgent(agentId, prompt, 180);
-
-        if (response.success) {
-          addScript(contentId, response.message, agentId);
+        const ok = await generateScriptForContent(contentId, channel, content, agentId);
+        if (ok) {
           console.log(`✅ Script generated for: ${content.title}`);
           setTaskStatus(`script:${contentId}`, "done", "Script generated");
         } else {
-          console.error(`❌ Script gen failed:`, response.message);
-          setTaskStatus(`script:${contentId}`, "error", response.message);
+          setTaskStatus(`script:${contentId}`, "error", "Script generation failed");
         }
       })();
 
@@ -216,6 +269,7 @@ Bun.serve({
           workflow_id: body.workflow_id,
           orientation: body.orientation,
           video_duration: body.video_duration,
+          auto_approve: body.auto_approve,
         });
         return Response.json({ ok: true });
       })();
@@ -543,16 +597,25 @@ steps:
     // POST /api/production/:id/start — start production pipeline
     const prodStartMatch = path.match(/^\/api\/production\/(\d+)\/start$/);
     if (prodStartMatch && req.method === "POST") {
-      const contentId = parseInt(prodStartMatch[1]);
-      const content = getContentById(contentId) as any;
-      if (!content) return Response.json({ error: "Content not found" }, { status: 404 });
+      return (async () => {
+        const contentId = parseInt(prodStartMatch[1]);
+        const content = getContentById(contentId) as any;
+        if (!content) return Response.json({ error: "Content not found" }, { status: 404 });
 
-      // Start pipeline in background (handles cleanup + status internally)
-      startPipeline(contentId).catch((err) => {
-        console.error(`❌ Pipeline failed for content ${contentId}:`, err);
-      });
+        // Accept optional workflow_id override
+        let workflowId: string | undefined;
+        try {
+          const body = await req.json();
+          workflowId = body.workflow_id;
+        } catch {}
 
-      return Response.json({ ok: true, message: "Production started" });
+        // Start pipeline in background
+        startPipeline(contentId, workflowId).catch((err) => {
+          console.error(`❌ Pipeline failed for content ${contentId}:`, err);
+        });
+
+        return Response.json({ ok: true, message: "Production started" });
+      })();
     }
 
     // GET /api/production/:id — get pipeline status
@@ -616,12 +679,96 @@ steps:
       return Response.json({ ok: true, message: "Reset to script_approved" });
     }
 
+    // POST /api/content/:id/cancel — cancel production, reset to discovered
+    const cancelMatch = path.match(/^\/api\/content\/(\d+)\/cancel$/);
+    if (cancelMatch && req.method === "POST") {
+      const contentId = parseInt(cancelMatch[1]);
+      deletePipelineJobs(contentId);
+      // Also delete script
+      db.run("DELETE FROM scripts WHERE content_id = ?", [contentId]);
+      updateContentStatus(contentId, "discovered");
+      return Response.json({ ok: true, message: `Content ${contentId} cancelled — back to discovered` });
+    }
+
+    // DELETE /api/content/:id — permanently delete content
+    const contentDeleteMatch = path.match(/^\/api\/content\/(\d+)$/);
+    if (contentDeleteMatch && req.method === "DELETE") {
+      const contentId = parseInt(contentDeleteMatch[1]);
+      deletePipelineJobs(contentId);
+      db.run("DELETE FROM scripts WHERE content_id = ?", [contentId]);
+      db.run("DELETE FROM content WHERE id = ?", [contentId]);
+      return Response.json({ ok: true, message: `Content ${contentId} deleted` });
+    }
+
     // DELETE /api/channels/:id
     const chDeleteMatch = path.match(/^\/api\/channels\/(.+)$/);
     if (chDeleteMatch && req.method === "DELETE") {
       const id = chDeleteMatch[1];
       deleteChannel(id);
       return Response.json({ ok: true });
+    }
+
+    // --- Agent Autonomy ---
+
+    // POST /api/auto-approve/:channel — approve all discovered + generate scripts + produce
+    const autoApproveMatch = path.match(/^\/api\/auto-approve\/(.+)$/);
+    if (autoApproveMatch && req.method === "POST") {
+      const channelId = autoApproveMatch[1];
+      const channel = getChannel(channelId) as any;
+      if (!channel) return Response.json({ error: "Channel not found" }, { status: 404 });
+
+      const discovered = getContent(channelId, "discovered") as any[];
+      if (discovered.length === 0) {
+        return Response.json({ ok: true, message: "No discovered content to approve", approved: 0 });
+      }
+
+      autoApproveChannel(channelId).catch((err) => {
+        console.error(`❌ Auto-approve failed for ${channelId}:`, err.message);
+      });
+
+      return Response.json({ ok: true, message: `Auto-approving ${discovered.length} items`, approved: discovered.length });
+    }
+
+    // POST /api/auto-retry/:id? — retry failed steps (optional content id, or all)
+    const autoRetryMatch = path.match(/^\/api\/auto-retry(?:\/(\d+))?$/);
+    if (autoRetryMatch && req.method === "POST") {
+      const contentId = autoRetryMatch[1] ? parseInt(autoRetryMatch[1]) : undefined;
+      const MAX_RETRIES = 3;
+
+      const failedJobs = getFailedPipelineJobs(contentId);
+      const retriable = failedJobs.filter((j: any) => (j.retry_count || 0) < MAX_RETRIES);
+      const skipped = failedJobs.length - retriable.length;
+
+      // Retry in background, one content at a time
+      (async () => {
+        const contentIds = [...new Set(retriable.map((j: any) => j.content_id))];
+        for (const cid of contentIds) {
+          const contentJobs = retriable.filter((j: any) => j.content_id === cid);
+          const firstFailed = contentJobs[0];
+          if (firstFailed) {
+            incrementRetryCount(firstFailed.id);
+            console.log(`🔄 Auto-retrying step ${firstFailed.step} for content ${cid} (retry #${(firstFailed.retry_count || 0) + 1})`);
+            try {
+              await retryStep(cid, firstFailed.step);
+            } catch (err: any) {
+              console.error(`❌ Auto-retry failed for content ${cid}, step ${firstFailed.step}:`, err.message);
+            }
+          }
+        }
+      })();
+
+      return Response.json({
+        ok: true,
+        message: `Retrying ${retriable.length} failed jobs (${skipped} skipped — max retries reached)`,
+        retrying: retriable.length,
+        skipped,
+      });
+    }
+
+    // GET /api/watchdog — system health overview
+    if (path === "/api/watchdog" && req.method === "GET") {
+      const health = getSystemHealth();
+      return Response.json(health);
     }
 
     return new Response("Not Found", { status: 404 });

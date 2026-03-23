@@ -27,15 +27,11 @@ export { loadEnv };
 // Pipeline orchestration
 // ---------------------------------------------------------------------------
 
-function resolveProfile(channel: any) {
-  const base = channel.workflow_id ? getWorkflow(channel.workflow_id) : null;
+function resolveProfile(channel: any, workflowId?: string) {
+  const wfId = workflowId || channel.workflow_id;
+  const base = wfId ? getWorkflow(wfId) : null;
   if (!base) return null;
-  return {
-    ...base,
-    orientation: channel.orientation || base.orientation,
-    resolution: channel.orientation === "portrait" ? "1080x1920" : channel.orientation === "square" ? "1080x1080" : base.resolution,
-    video_duration: channel.video_duration || base.video_duration,
-  };
+  return { ...base };
 }
 
 function outputDirFor(channelId: string, contentId: number): string {
@@ -48,7 +44,7 @@ function outputDirFor(channelId: string, contentId: number): string {
 // Prevent concurrent pipeline runs on same content
 const runningPipelines = new Set<number>();
 
-export async function startPipeline(contentId: number): Promise<void> {
+export async function startPipeline(contentId: number, workflowId?: string): Promise<void> {
   if (runningPipelines.has(contentId)) {
     console.warn(`⚠️  Pipeline already running for content ${contentId} — skipping`);
     return;
@@ -60,8 +56,8 @@ export async function startPipeline(contentId: number): Promise<void> {
   const channel = getChannel(content.channel_id) as any;
   if (!channel) throw new Error(`Channel not found: ${content.channel_id}`);
 
-  // Resolve steps from workflow profile
-  const profile = resolveProfile(channel);
+  // Resolve steps from workflow profile (use override or channel default)
+  const profile = resolveProfile(channel, workflowId);
   const available = getAvailableSteps();
   const steps = profile
     ? resolveSteps(profile).filter((s) => available.includes(s))

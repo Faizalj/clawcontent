@@ -99,6 +99,26 @@ Lipsync is skipped if `use_lipsync: false` in workflow profile.
 - Assembly: ffmpeg (local)
 - Agent: OpenClaw Gateway (HTTP API + CLI fallback)
 
+## CLI
+
+`clawcontent` CLI (installed via `bun link`) — calls localhost:3456 API.
+
+```
+channels, scan, ideas, approve, reject
+script, script-view, script-approve
+produce, status, stop, retry, reset
+publish, seo
+auto-approve, auto-retry, watchdog
+```
+
+### Autonomy Features
+
+- **auto-approve** `<channel>` — approve all discovered → generate script → approve script → start production (full chain)
+- **auto-retry** `[content-id]` — retry failed pipeline steps (max 3 retries per step). Omit id = retry all.
+- **watchdog** — system health: channel count, content status, pipeline status, stuck jobs (>30min)
+
+Channel `auto_approve` setting: when enabled, scan results are automatically fed through the full auto-approve chain.
+
 ## Common Tasks
 
 **Add a new pipeline step:** Create `steps/xxx.ts`, export PipelineStep

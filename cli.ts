@@ -16,7 +16,13 @@ async function api(path: string, method = "GET", body?: any) {
   }
   try {
     const res = await fetch(`${BASE}${path}`, opts);
-    return res.json();
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      console.error(`Error: unexpected response from server — ${text.slice(0, 100)}`);
+      process.exit(1);
+    }
   } catch {
     console.error("Error: ClawContent server not running. Start with: bun run dev");
     process.exit(1);
@@ -102,8 +108,11 @@ switch (cmd) {
   // --- Production ---
   case "produce": {
     const id = args[0];
-    if (!id) { console.error("Usage: clawcontent produce <content-id>"); process.exit(1); }
-    const result = await api(`/api/production/${id}/start`, "POST");
+    if (!id) { console.error("Usage: clawcontent produce <content-id> [--workflow <id>]"); process.exit(1); }
+    const wfIdx = args.indexOf("--workflow");
+    const workflowId = wfIdx >= 0 ? args[wfIdx + 1] : undefined;
+    const body = workflowId ? { workflow_id: workflowId } : undefined;
+    const result = await api(`/api/production/${id}/start`, "POST", body);
     console.log(JSON.stringify(result));
     break;
   }
@@ -173,6 +182,59 @@ switch (cmd) {
     break;
   }
 
+  case "cancel": {
+    const id = args[0];
+    if (!id) { console.error("Usage: clawcontent cancel <content-id>"); process.exit(1); }
+    const result = await api(`/api/content/${id}/cancel`, "POST");
+    console.log(result.message || JSON.stringify(result));
+    break;
+  }
+
+  case "delete": {
+    const id = args[0];
+    if (!id) { console.error("Usage: clawcontent delete <content-id>"); process.exit(1); }
+    const result = await api(`/api/content/${id}`, "DELETE");
+    console.log(result.message || JSON.stringify(result));
+    break;
+  }
+
+  // --- Agent Autonomy ---
+  case "auto-approve": {
+    const channel = args[0];
+    if (!channel) { console.error("Usage: clawcontent auto-approve <channel-id>"); process.exit(1); }
+    const result = await api(`/api/auto-approve/${channel}`, "POST");
+    console.log(result.message || JSON.stringify(result));
+    break;
+  }
+
+  case "auto-retry": {
+    const id = args[0];
+    if (id === "--all" || !id) {
+      const result = await api(`/api/auto-retry`, "POST");
+      console.log(result.message || JSON.stringify(result));
+    } else {
+      const result = await api(`/api/auto-retry/${id}`, "POST");
+      console.log(result.message || JSON.stringify(result));
+    }
+    break;
+  }
+
+  case "watchdog": {
+    const health = await api(`/api/watchdog`);
+    console.log(`Channels: ${health.channels}`);
+    console.log(`Content: ${Object.entries(health.content || {}).map(([k, v]) => `${v} ${k}`).join(", ") || "none"}`);
+    console.log(`Pipeline: ${Object.entries(health.pipelines || {}).map(([k, v]) => `${v} ${k}`).join(", ") || "none"}`);
+    if (health.stuck?.length > 0) {
+      console.log(`\n⚠️  Stuck pipelines (>30min):`);
+      for (const j of health.stuck) {
+        console.log(`  [${j.content_id}] ${j.content_title} — step: ${j.step} (started: ${j.started_at})`);
+      }
+    } else {
+      console.log(`\n✅ No stuck pipelines`);
+    }
+    break;
+  }
+
   // --- Help ---
   default: {
     console.log(`ClawContent CLI — Content Automation
@@ -187,6 +249,8 @@ Discovery:
 Content:
   approve <id>                Approve content
   reject <id>                 Reject content
+  cancel <id>                 Cancel production → back to discovered
+  delete <id>                 Permanently delete content
 
 Script:
   script <id>                 Generate script
@@ -194,7 +258,7 @@ Script:
   script-approve <id>         Approve script
 
 Production:
-  produce <id>                Start production pipeline
+  produce <id> [--workflow X]  Start production (optional workflow)
   status <id>                 Pipeline status (all steps + chunks)
   stop <id> <step>            Stop a running step
   retry <id> <step>           Retry a failed/done step
@@ -203,6 +267,11 @@ Production:
 Publishing:
   publish <id>                Publish content
   seo <id>                    Generate SEO metadata
+
+Autonomy:
+  auto-approve <channel>      Auto-approve → script → produce all discovered
+  auto-retry [id]             Retry failed steps (omit id for all failed)
+  watchdog                    System health + stuck pipeline detection
 
 Requires: bun run dev (server at localhost:3456)`);
   }

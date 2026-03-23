@@ -87,8 +87,23 @@ clawcontent seo <content-id>
 clawcontent publish <content-id>
 ```
 
+### Autonomy — ทำงานอัตโนมัติ
+
+```bash
+# Auto-approve all discovered content → generate scripts → produce
+clawcontent auto-approve <channel-id>
+
+# Auto-retry failed pipeline steps (single content or all)
+clawcontent auto-retry <content-id>
+clawcontent auto-retry              # retry all failed
+
+# System health check
+clawcontent watchdog
+```
+
 ## Typical Workflow
 
+### Manual (step-by-step)
 1. `clawcontent scan builder-with-ai` — หาข่าว
 2. `clawcontent ideas builder-with-ai` — ดูข่าวที่เจอ
 3. `clawcontent approve 5` — เลือกข่าวที่ต้องการ
@@ -98,6 +113,13 @@ clawcontent publish <content-id>
 7. `clawcontent produce 5` — เริ่มสร้าง video
 8. `clawcontent status 5` — ดู progress
 9. `clawcontent publish 5` — เผยแพร่
+
+### Autonomous (full auto)
+1. `clawcontent scan builder-with-ai` — หาข่าว
+2. `clawcontent auto-approve builder-with-ai` — approve ทุกข่าว → script → produce อัตโนมัติ
+3. `clawcontent watchdog` — ดู status ทั้งระบบ
+4. `clawcontent auto-retry` — retry ทุก step ที่ fail
+5. `clawcontent publish 5` — เผยแพร่
 
 ## Pipeline Steps
 

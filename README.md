@@ -260,13 +260,34 @@ whisperToSrt(data)             // Convert Whisper JSON to SRT
 buildSrt(sentences)            // Build SRT from sentence list
 ```
 
+## Agent Autonomy
+
+Channels can enable **auto-approve** — when a scan finds new content, the system automatically:
+1. Approves all discovered items
+2. Generates scripts via AI agent
+3. Approves scripts
+4. Starts production pipeline
+
+```bash
+# One-shot: auto-approve everything in a channel
+clawcontent auto-approve builder-with-ai
+
+# Retry all failed pipeline steps (max 3 retries per step)
+clawcontent auto-retry
+
+# System health check — stuck pipelines, content counts
+clawcontent watchdog
+```
+
+Enable per-channel in dashboard: Edit channel → toggle **Auto-approve**.
+
 ## Content Pipeline Flow
 
 ```
 discovered → approved → scripted → script_approved → producing → done
 ```
 
-Each transition is triggered by user action in dashboard or API call.
+Each transition is triggered by user action, CLI command, or auto-approve.
 
 ## API Endpoints
 
@@ -293,6 +314,9 @@ Each transition is triggered by user action in dashboard or API call.
 | GET | /api/settings | Get settings (masked values) |
 | POST | /api/settings | Save settings |
 | GET | /api/agents | List OpenClaw agents |
+| POST | /api/auto-approve/:channel | Auto-approve → script → produce all discovered |
+| POST | /api/auto-retry/:id? | Retry failed steps (id optional, omit = all) |
+| GET | /api/watchdog | System health + stuck pipeline detection |
 
 ## Troubleshooting
 
