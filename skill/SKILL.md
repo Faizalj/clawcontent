@@ -11,7 +11,16 @@ Automate video content production: discover ideas → write scripts → produce 
 
 ## CLI Commands
 
-Run all commands with `bun run /path/to/clawcontent/cli.ts <command>` or if installed globally `clawcontent <command>`.
+**How to run:** `clawcontent <command>`
+
+**Install CLI (one time):**
+```bash
+cd <clawcontent-repo-path>
+bun link
+```
+This makes `clawcontent` available globally.
+
+**Server must be running:** `cd <clawcontent-repo-path> && bun run dev`
 
 ### Discovery — หาข่าว/ไอเดีย
 
@@ -101,7 +110,7 @@ clawcontent publish <content-id>
 
 ## Notes
 
-- Server must be running: `cd /path/to/clawcontent && bun run dev`
+- Server must be running: `cd ~/Project/clawcontent && bun run dev`
 - All output is JSON — parse with jq if needed
 - Pipeline steps run sequentially, lipsync has chunk resume
 - Lipsync chunks are saved — retry doesn't re-render completed chunks
