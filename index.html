@@ -1238,7 +1238,33 @@ async function openSettingsModal() {
     </div>
   `;
 
-  container.innerHTML = agentHtml + SETTINGS_CONFIG.map(cfg => {
+  // GPU Compute section
+  const currentGpu = settings.find(s => s.key === 'GPU_PROVIDER');
+  const gpuValue = currentGpu?.masked || 'modal';
+  const gpuHtml = `
+    <div class="form-group" style="border-bottom:1px solid var(--border);padding-bottom:14px;margin-bottom:14px;">
+      <label>GPU Compute</label>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;text-transform:none;letter-spacing:0;padding:8px 12px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius-sm);">
+          <input type="radio" name="gpu-provider" value="modal" ${gpuValue !== 'local' ? 'checked' : ''} onchange="toggleGpuSettings()">
+          <div>
+            <div style="font-weight:600;">Cloud (Modal)</div>
+            <div style="font-size:11px;color:var(--text-muted);">จ่ายตามใช้ ไม่ต้องมี GPU บนเครื่อง</div>
+          </div>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;text-transform:none;letter-spacing:0;padding:8px 12px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius-sm);">
+          <input type="radio" name="gpu-provider" value="local" ${gpuValue === 'local' ? 'checked' : ''} onchange="toggleGpuSettings()">
+          <div>
+            <div style="font-weight:600;">Local GPU</div>
+            <div style="font-size:11px;color:var(--text-muted);">ใช้ GPU บนเครื่องนี้ (NVIDIA + CUDA)</div>
+          </div>
+        </label>
+      </div>
+      <div id="gpu-modal-fields" style="${gpuValue === 'local' ? 'display:none;' : ''}margin-top:8px;"></div>
+    </div>
+  `;
+
+  container.innerHTML = agentHtml + gpuHtml + SETTINGS_CONFIG.map(cfg => {
     const s = settings.find(x => x.key === cfg.key);
     const statusColor = !s || s.source === 'not-set' ? '#f85149' : '#3fb950';
     const statusText = !s || s.source === 'not-set' ? 'Not set' : s.source === 'dashboard' ? 'Set (Dashboard)' : 'Set (.env file)';
@@ -1258,13 +1284,22 @@ async function openSettingsModal() {
   }).join('');
 }
 
+function toggleGpuSettings() {
+  const modal = document.getElementById('gpu-modal-fields');
+  const isModal = document.querySelector('input[name="gpu-provider"]:checked')?.value === 'modal';
+  if (modal) modal.style.display = isModal ? '' : 'none';
+}
+
 function closeSettingsModal() {
   document.getElementById('settings-modal').classList.remove('visible');
 }
 
 async function saveSettings() {
+  const gpuProvider = document.querySelector('input[name="gpu-provider"]:checked')?.value || 'modal';
+
   const entries = [
     { key: 'DEFAULT_AGENT_ID', value: document.getElementById('setting-DEFAULT_AGENT_ID')?.value?.trim() || '' },
+    { key: 'GPU_PROVIDER', value: gpuProvider },
     ...SETTINGS_CONFIG.map(cfg => ({
       key: cfg.key,
       value: document.getElementById(`setting-${cfg.key}`).value.trim(),

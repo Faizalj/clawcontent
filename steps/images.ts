@@ -1,6 +1,6 @@
 import type { PipelineStep, PipelineContext } from "./types";
 import {
-  runModal,
+  runGpu,
   parseModalOutput,
   extractAllImagePrompts,
   parseScriptSections,
@@ -50,7 +50,7 @@ const step: PipelineStep = {
 
     // Send all prompts in one Modal run — boot once, gen all
     const batchJson = JSON.stringify(batch).replace(/'/g, "'\\''");
-    const stdout = await runModal("flux_image.py", {
+    const stdout = await runGpu("flux_image.py", {
       "prompts-json": `'${batchJson}'`,
     });
 

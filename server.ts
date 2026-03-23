@@ -398,7 +398,7 @@ Bun.serve({
 
     // GET /api/settings — return settings with masked values
     if (path === "/api/settings" && req.method === "GET") {
-      const KNOWN_KEYS = ["DEFAULT_AGENT_ID", "ELEVENLABS_API_KEY", "MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET"];
+      const KNOWN_KEYS = ["DEFAULT_AGENT_ID", "GPU_PROVIDER", "ELEVENLABS_API_KEY", "MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET"];
       const settings = getAllSettings();
       const env = loadEnv();
 
@@ -424,7 +424,7 @@ Bun.serve({
         if (!Array.isArray(entries)) {
           return Response.json({ error: "Invalid payload" }, { status: 400 });
         }
-        const ALLOWED_KEYS = ["DEFAULT_AGENT_ID", "ELEVENLABS_API_KEY", "MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET"];
+        const ALLOWED_KEYS = ["DEFAULT_AGENT_ID", "GPU_PROVIDER", "ELEVENLABS_API_KEY", "MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET"];
         for (const entry of entries) {
           if (!ALLOWED_KEYS.includes(entry.key)) continue;
           if (entry.value && entry.value.trim()) {

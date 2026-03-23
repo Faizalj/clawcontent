@@ -1,5 +1,5 @@
 import type { PipelineStep, PipelineContext } from "./types";
-import { runModal, parseModalOutput, existsSync } from "./helpers";
+import { runGpu, parseModalOutput, existsSync } from "./helpers";
 
 const step: PipelineStep = {
   name: "lipsync",
@@ -23,7 +23,7 @@ const step: PipelineStep = {
 
     // modal run handles chunking internally:
     // local_entrypoint splits audio ~20s → generate_lipsync.remote() per chunk → concat
-    const stdout = await runModal("lipsync.py", {
+    const stdout = await runGpu("lipsync.py", {
       "audio-path": ctx.voicePath,
       "image-path": avatarUrl,
       "output-path": outPath,

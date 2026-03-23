@@ -222,5 +222,54 @@ export function fmtSrt(sec: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")},${String(ms).padStart(3, "0")}`;
 }
 
+// ---------------------------------------------------------------------------
+// GPU Provider routing — Modal or Local
+// ---------------------------------------------------------------------------
+
+export function getGpuProvider(): string {
+  const env = loadEnv();
+  return env.GPU_PROVIDER || "modal";
+}
+
+/**
+ * Run a GPU task — routes to Modal or Local based on settings.
+ * For Local: runs the same Python script directly (needs local GPU + deps).
+ */
+export async function runGpu(
+  script: string,
+  args: Record<string, string>
+): Promise<string> {
+  const provider = getGpuProvider();
+
+  if (provider === "local") {
+    return runLocal(script, args);
+  }
+  return runModal(script, args);
+}
+
+async function runLocal(
+  script: string,
+  args: Record<string, string>
+): Promise<string> {
+  // Run Python script directly — requires local GPU + dependencies
+  const scriptPath = `${MODAL_DIR}/${script}`;
+  const argList = Object.entries(args).map(
+    ([k, v]) => `--${k} ${v}`
+  ).join(" ");
+
+  const cmd = `python3 ${scriptPath} ${argList}`;
+  console.log(`🖥️  Local GPU: ${script} ${argList.slice(0, 100)}`);
+
+  try {
+    const result = await $`bash -c ${cmd}`.text();
+    return result.trim();
+  } catch (err: any) {
+    const stderr = err.stderr?.toString() || "";
+    const detail = stderr || err.message || "Unknown error";
+    console.error(`❌ Local ${script} failed:`, detail.slice(0, 500));
+    throw new Error(`Local ${script}: ${detail.slice(0, 300)}`);
+  }
+}
+
 // Re-export common deps for steps
 export { $, mkdirSync, writeFileSync, readFileSync, existsSync, homedir };

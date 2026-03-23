@@ -1,7 +1,7 @@
 import type { PipelineStep, PipelineContext } from "./types";
 import {
   loadEnv,
-  runModal,
+  runGpu,
   parseModalOutput,
   stripScriptForTTS,
   writeFileSync,
@@ -58,7 +58,7 @@ async function voiceModal(
     args["reference-audio"] = referenceAudio;
   }
 
-  const stdout = await runModal(script, args);
+  const stdout = await runGpu(script, args);
   const result = parseModalOutput(stdout);
   if (result.status !== "completed") {
     throw new Error(`Modal TTS failed: ${JSON.stringify(result)}`);
