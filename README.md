@@ -1,6 +1,16 @@
-# ClawContent v1.0 Beta — Agent Setup Guide
+# ClawContent v1.0 Beta
 
-You are setting up ClawContent for your principal (the user). They already have OpenClaw installed and running. Follow these steps exactly.
+Open-source content automation framework — สร้าง video content อัตโนมัติตั้งแต่หาข่าว → เขียน script → สร้างวิดีโอ
+
+**Community:** [www.clawzen.ai](https://www.clawzen.ai) — เข้า ClawZen Community สำหรับ support, tutorials, และแชร์ workflows
+
+**License:** Open Source — contribute pipeline steps, workflows, และ improvements ได้เลย! ดู [CONTRIBUTING.md](CONTRIBUTING.md)
+
+---
+
+## Agent Setup Guide
+
+This README is written for AI coding agents (Claude Code, PAI) to set up ClawContent for users. Follow these steps exactly.
 
 ## Prerequisites Check
 
@@ -271,3 +281,12 @@ Each transition is triggered by user action in dashboard or API call.
 | Thumbnail empty | Playwright not installed | `npx playwright install chromium` |
 | Captions timing wrong | Whisper not installed, using fallback | `pip install openai-whisper` |
 | 404 on HTTP API | chatCompletions not enabled | Add http.endpoints config to openclaw.json |
+
+## Community
+
+- **Website:** [www.clawzen.ai](https://www.clawzen.ai)
+- **GitHub:** [github.com/Faizalj/clawcontent](https://github.com/Faizalj/clawcontent)
+- **Contributing:** See [CONTRIBUTING.md](CONTRIBUTING.md)
+- **For AI Agents:** See [CLAUDE.md](CLAUDE.md)
+
+Built with by the ClawZen community.

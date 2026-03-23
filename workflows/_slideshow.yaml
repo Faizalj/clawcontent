@@ -7,7 +7,7 @@ video_duration: 3-4min
 script_format: 4-section
 
 tts_provider: elevenlabs
-tts_voice_id: camsOHfnF030L7enGMzZ
+tts_voice_id: ""
 image_style: "cinematic photography, dramatic lighting, 16:9"
 use_lipsync: false
 

@@ -15,7 +15,7 @@ script_instruction: ""       # custom prompt for agent
 
 # Voice
 tts_provider: elevenlabs     # elevenlabs | chatterbox | f5tts-thai
-tts_voice_id: camsOHfnF030L7enGMzZ
+tts_voice_id: ""                    # ใส่ ElevenLabs voice clone ID ของคุณ
 
 # Visual
 image_style: "professional digital illustration, modern, clean, vibrant colors"

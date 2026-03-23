@@ -20,7 +20,7 @@ async function voiceElevenLabs(
   if (!apiKey) throw new Error("ELEVENLABS_API_KEY not set — add in Settings");
 
   const res = await fetch(
-    "https://api.elevenlabs.io/v1/text-to-speech/camsOHfnF030L7enGMzZ",
+    `https://api.elevenlabs.io/v1/text-to-speech/${ctx.profile?.tts_voice_id || ctx.env.ELEVENLABS_VOICE_ID || ""}`,
     {
       method: "POST",
       headers: {
