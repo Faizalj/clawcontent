@@ -630,30 +630,5 @@ steps:
 
 console.log(`🚀 Content Dashboard running at http://localhost:${PORT}`);
 
-// --- Daily Cron: Scan all channels at 7:00 AM ---
-function scheduleDailyScan() {
-  const now = new Date();
-  const next7am = new Date(now);
-  next7am.setHours(7, 3, 0, 0); // 07:03 to avoid :00 congestion
-  if (next7am <= now) next7am.setDate(next7am.getDate() + 1);
-
-  const delay = next7am.getTime() - now.getTime();
-  console.log(`⏰ Next daily scan at ${next7am.toLocaleString("th-TH")} (in ${Math.round(delay / 60000)} min)`);
-
-  setTimeout(async () => {
-    console.log("⏰ Daily scan triggered!");
-    const channels = getChannels() as any[];
-    for (const ch of channels) {
-      if (!ch.agent_id) continue;
-      console.log(`  📡 Scanning ${ch.name}...`);
-      // Call our own scan API
-      await fetch(`http://localhost:${PORT}/api/scan/${ch.id}`, { method: "POST" });
-      // Stagger between channels
-      await new Promise((r) => setTimeout(r, 5000));
-    }
-    // Schedule next day
-    scheduleDailyScan();
-  }, delay);
-}
-
-scheduleDailyScan();
+// Daily scan: use OpenClaw cron instead of built-in timer
+// Setup: openclaw cron add --schedule "0 7 * * *" --agent main --message "clawcontent scan builder-with-ai"
